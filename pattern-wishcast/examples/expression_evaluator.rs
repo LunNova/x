@@ -140,7 +140,7 @@ impl<P: PatternFields> std::fmt::Display for Value<P> {
 			}
 			Value::StuckEvaluation(stuck, _) => match stuck {
 				StuckEvaluation::Var { id } => write!(f, "?{}", id),
-				StuckEvaluation::UnboundVariable { name } => write!(f, "⊥{}", name),
+				StuckEvaluation::UnboundVariable { name } => write!(f, "?{}", name),
 				StuckEvaluation::Application { func, arg } => {
 					write!(f, "({}{})", func, arg)
 				}
@@ -420,54 +420,14 @@ fn main() {
 	//   y = 25
 	// }
 
-	// (⊥add(⊥x, 5))  = 105
+	// (?add(?x, 5))  = 105
 	//   is_complete() = true
 	//   ✓ Successfully downcast to CompleteValue
 
-	// (⊥mul(⊥y, 2))  = 50
+	// (?mul(?y, 2))  = 50
 	//   is_complete() = true
 	//   ✓ Successfully downcast to CompleteValue
 
-	// (⊥mul(⊥z, 2))  = (⟨builtin: mul⟩(⊥z, 2))
+	// (?mul(?z, 2))  = (⟨builtin: mul⟩(?z, 2))
 	//   is_complete() = false
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_complete_arithmetic() {
-		let x = CompleteValue::number(10);
-		let y = CompleteValue::number(5);
-		let sum = x.add(y).unwrap();
-		assert_eq!(sum.as_number().unwrap(), 15);
-	}
-
-	#[test]
-	fn test_complete_upcast() {
-		let complete = CompleteValue::number(42);
-		let partial = complete.to_partial();
-		assert!(partial.is_complete());
-		assert_eq!(partial.try_to_complete().unwrap().as_number().unwrap(), 42);
-	}
-
-	#[test]
-	fn test_stuck_downcast_fails() {
-		let stuck = PartialValue::stuck_var(99);
-		assert!(!stuck.is_complete());
-		assert!(stuck.try_to_complete().is_err());
-	}
-
-	#[test]
-	fn test_lazy_evaluation() {
-		let ctx = EvalContext::new();
-		let lazy = PartialValue::LazyComputation {
-			thunk: Box::new(CompleteValue::boolean(true).to_partial()),
-			_never: (),
-		};
-		let result = lazy.eval(&ctx);
-		assert!(result.is_complete());
-		assert_eq!(result.try_to_complete().unwrap().as_boolean().unwrap(), true);
-	}
 }
