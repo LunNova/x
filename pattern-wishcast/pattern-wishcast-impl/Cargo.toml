@@ -6,7 +6,7 @@
 [package]
 name = "pattern-wishcast-impl"
 description = "impl crate for pattern_wishcast! proc macro in pattern-wishcast"
-version = "0.0.0"
+version = "0.0.1-alpha.0"
 edition = "2024"
 repository = "https://github.com/LunNova/x"
 rust-version = "1.89"
