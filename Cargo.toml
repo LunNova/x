@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2025 LunNova
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[workspace]
+members = [
+    "pattern-wishcast",
+    "pattern-wishcast/pattern-wishcast-impl",
+]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.85"
+edition = "2024"

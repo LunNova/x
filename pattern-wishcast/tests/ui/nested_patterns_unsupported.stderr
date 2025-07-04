@@ -1,0 +1,5 @@
+error: Field patterns are not supported. Only wildcard pattern { .. } is allowed for struct variants. Field patterns will require native pattern types support in Rust.
+  --> tests/ui/nested_patterns_unsupported.rs:18:38
+   |
+18 |     type SpecificText = Value is Text { content: "hello" | "world" };
+   |                                         ^^^^^^^

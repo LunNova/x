@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2025 LunNova
+#
+# SPDX-License-Identifier: CC0-1.0
+
+target/
+.direnv/
+.claude/
+/.pre-commit-config.yaml
+/result
+/target

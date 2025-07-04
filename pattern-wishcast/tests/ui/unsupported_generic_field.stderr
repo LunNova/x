@@ -1,0 +1,13 @@
+error: Unsupported field type: HashMap containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. Field: data
+  --> tests/ui/unsupported_generic_field.rs:12:1
+   |
+12 | / pattern_wishcast! {
+13 | |     enum StuckEvaluation = {
+14 | |         Var { id: usize },
+15 | |     };
+...  |
+27 | |     impl StrictValue : FlexValue;
+28 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `pattern_wishcast` (in Nightly builds, run with -Z macro-backtrace for more info)

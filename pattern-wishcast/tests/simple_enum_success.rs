@@ -1,0 +1,21 @@
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+//! Test that simple enums without pattern support work correctly
+
+use pattern_wishcast::pattern_wishcast;
+
+pattern_wishcast! {
+	// Simple enum without pattern support - should work fine
+	enum Color = {
+		Red,
+		Green,
+		Blue { intensity: u8 },
+	};
+}
+
+fn main() {
+	let c = Color::Blue { intensity: 255 };
+	println!("Color: {:?}", c);
+}

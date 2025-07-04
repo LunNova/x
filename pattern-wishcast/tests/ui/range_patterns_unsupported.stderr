@@ -1,0 +1,5 @@
+error: Field patterns are not supported. Only wildcard pattern { .. } is allowed for struct variants. Field patterns will require native pattern types support in Rust.
+  --> tests/ui/range_patterns_unsupported.rs:18:40
+   |
+18 |     type SmallNumbers = Value is Number { value: 1..10 };
+   |                                           ^^^^^

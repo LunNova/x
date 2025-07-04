@@ -1,0 +1,7 @@
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+fn main() {
+	println!("Hello, world!");
+}

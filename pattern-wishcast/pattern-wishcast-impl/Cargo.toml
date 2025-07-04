@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2025 LunNova
+#
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "pattern-wishcast-impl"
+description = "impl crate for pattern_wishcast! proc macro in pattern-wishcast"
+version = "0.0.0"
+edition = "2024"
+repository = "https://github.com/LunNova/x"
+rust-version = "1.89"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+darling = "0.20"

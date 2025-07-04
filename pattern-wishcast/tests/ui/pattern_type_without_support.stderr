@@ -1,0 +1,13 @@
+error: Cannot create pattern type for enum `"Value"`. You must declare the enum with pattern support: `enum "Value" is <P: PatternTrait> { ... }`
+  --> tests/ui/pattern_type_without_support.rs:11:1
+   |
+11 | / pattern_wishcast! {
+12 | |     // This enum doesn't declare pattern support
+13 | |     enum Value = {
+14 | |         HostValue { value: String },
+...  |
+19 | |     type StrictValue = Value is HostValue(_);
+20 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `pattern_wishcast` (in Nightly builds, run with -Z macro-backtrace for more info)

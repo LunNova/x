@@ -1,0 +1,122 @@
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+//! Test union composition with pattern types (RFC syntax path)
+
+#![feature(never_type)]
+
+use pattern_wishcast::pattern_wishcast;
+
+pattern_wishcast! {
+	// Base enums for composition
+	enum CoreAtoms = {
+		BoundVariable { index: i64, debug: String },
+		FreeVariable { id: usize },
+		Level0,
+		LevelType,
+	};
+
+	enum TypeConstructors = {
+		Pi { param_type: Box<String>, result_type: Box<String> },
+		Star { level: i64 },
+		TupleType { desc: Box<String> },
+	};
+
+	enum ComplexTerms = {
+		Lambda { param_name: String, body: String },
+		Application { func: String, arg: String },
+		Let { name: String, expr: String, body: String },
+	};
+
+	// Union composition with pattern support
+	enum Value is <P: PatternFields> = CoreAtoms |
+		TypeConstructors |
+		Box<ComplexTerms> |
+		{
+			Literal { _value: Box<String> },
+			TupleCons { _elements: Vec<String> },
+			StuckEvaluation,
+	};
+
+	// Pattern types that exclude some variants
+	type FlexValue = Value is _;
+	type StrictValue = Value is CoreAtoms(_) | TypeConstructors(_) | Literal{ .. } | TupleCons(_);
+
+	#[derive(SubtypingRelation(upcast=to_flex, downcast=try_to_strict))]
+	impl StrictValue : FlexValue;
+}
+
+#[test]
+fn test_union_with_pattern_types() {
+	// Test union type creation
+	let atom = CoreAtoms::Level0;
+	let value: FlexValue = atom.into();
+	match &value {
+		FlexValue::CoreAtoms(CoreAtoms::Level0) => {}
+		_ => panic!("Expected CoreAtoms::Level0, got {:?}", value),
+	}
+
+	let ty_cons = TypeConstructors::Star { level: 0 };
+	let value2: FlexValue = ty_cons.into();
+	match &value2 {
+		FlexValue::TypeConstructors(TypeConstructors::Star { level: 0 }) => {}
+		_ => panic!("Expected TypeConstructors::Star {{ level: 0 }}, got {:?}", value2),
+	}
+
+	let complex = ComplexTerms::Lambda {
+		param_name: "x".to_string(),
+		body: "body".to_string(),
+	};
+	let value3: FlexValue = FlexValue::ComplexTerms(Box::new(complex), ());
+	match &value3 {
+		FlexValue::ComplexTerms(boxed, _) => match boxed.as_ref() {
+			ComplexTerms::Lambda { param_name, body } => {
+				assert_eq!(param_name, "x");
+				assert_eq!(body, "body");
+			}
+			_ => panic!("Expected Lambda variant"),
+		},
+		_ => panic!("Expected ComplexTerms variant, got {:?}", value3),
+	}
+
+	// Test inline variants
+	let literal = FlexValue::Literal {
+		_value: Box::new("test".to_string()),
+	};
+	match &literal {
+		FlexValue::Literal { _value } => {
+			assert_eq!(_value.as_str(), "test");
+		}
+		_ => panic!("Expected Literal variant, got {:?}", literal),
+	}
+
+	// Test pattern restrictions
+	let strict_literal = StrictValue::Literal {
+		_value: Box::new("strict".to_string()),
+	};
+	let as_flex = strict_literal.to_flex();
+	match &as_flex {
+		FlexValue::Literal { _value } => {
+			assert_eq!(_value.as_str(), "strict");
+		}
+		_ => panic!("Expected Literal variant after conversion, got {:?}", as_flex),
+	}
+
+	match as_flex.try_to_strict() {
+		Ok(strict) => match &strict {
+			StrictValue::Literal { _value } => {
+				assert_eq!(_value.as_str(), "strict");
+			}
+			_ => panic!("Expected Literal variant in strict conversion"),
+		},
+		Err(_) => panic!("Literal variant should convert back to strict"),
+	}
+
+	// Test conditional variant (should fail conversion)
+	let stuck = FlexValue::StuckEvaluation { _never: () };
+	match stuck.try_to_strict() {
+		Ok(_) => panic!("StuckEvaluation should not convert to strict"),
+		Err(_) => {} // Expected - StuckEvaluation is correctly rejected
+	}
+}

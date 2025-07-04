@@ -1,0 +1,12 @@
+error: Enum `Value` declares pattern support with `is <P: ...>` but no pattern types are defined. Either: 1) Add pattern type declarations like `type FlexValue = Value is _;`, or 2) Remove the `is <P: ...>` declaration if you don't need pattern-based strictness.
+  --> tests/ui/pattern_support_no_types.rs:11:1
+   |
+11 | / pattern_wishcast! {
+12 | |     enum Value is <P: PatternFields> = {
+13 | |         HostValue { value: String },
+14 | |         TupleValue { elements: Vec<Self> },
+...  |
+18 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `pattern_wishcast` (in Nightly builds, run with -Z macro-backtrace for more info)
