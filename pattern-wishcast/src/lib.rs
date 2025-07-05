@@ -2,4 +2,4 @@
 //
 // SPDX-License-Identifier: MIT
 
-pub use pattern_wishcast_impl::pattern_wishcast;
+pub use pattern_wishcast_macros::pattern_wishcast;
