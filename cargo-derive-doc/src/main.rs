@@ -303,6 +303,8 @@ fn match_expansions_with_diff(original: &str, expanded: &str) -> Result<HashMap<
 }
 
 fn extract_macro_name(line: &str) -> Option<String> {
+	// FIXME: This is a bodge. We need to identify that we care about macros that aren't in an fn body
+	// in a more principled way instead of string munging
 	// Only match macros that start at the very beginning of the line (zero indentation)
 	if !line.starts_with(|c: char| c.is_alphabetic()) {
 		return None;
