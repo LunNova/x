@@ -80,6 +80,7 @@
             pkgs.cargo-expand
             pkgs.cargo-release
             pkgs.cargo-workspaces
+            pkgs.cargo-machete
             pkgs.reuse
             rust-bin
           ];
