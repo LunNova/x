@@ -32,83 +32,77 @@ pub fn generate_field_check(
 			}
 		});
 	}
-	match field_type {
-		syn::Type::Path(type_path) => {
-			if let Some(segment) = type_path.path.segments.last() {
-				match segment.ident.to_string().as_str() {
-					"Vec" => {
-						// Vec<T> where T might be a Value type
-						if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-							if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-								if is_value_type(inner_type, enum_name) {
-									return Some(quote! {
-										for elem in #field_name {
-											elem.#check_method()?;
-										}
-									});
-								}
-							}
+	if let syn::Type::Path(type_path) = field_type
+		&& let Some(segment) = type_path.path.segments.last()
+	{
+		match segment.ident.to_string().as_str() {
+			"Vec" => {
+				// Vec<T> where T might be a Value type
+				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
+					&& is_value_type(inner_type, enum_name)
+				{
+					return Some(quote! {
+						for elem in #field_name {
+							elem.#check_method()?;
 						}
-					}
-					"Box" => {
-						// Box<T> where T might be a Value type
-						if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-							if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-								if is_value_type(inner_type, enum_name) {
-									return Some(quote! {
-										#field_name.#check_method()?;
-									});
-								}
-							}
+					});
+				}
+			}
+			"Box" => {
+				// Box<T> where T might be a Value type
+				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
+					&& is_value_type(inner_type, enum_name)
+				{
+					return Some(quote! {
+						#field_name.#check_method()?;
+					});
+				}
+			}
+			"Option" => {
+				// Option<T> where T might be a Value type
+				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
+					&& is_value_type(inner_type, enum_name)
+				{
+					return Some(quote! {
+						if let Some(ref value) = #field_name {
+							value.#check_method()?;
 						}
-					}
-					"Option" => {
-						// Option<T> where T might be a Value type
-						if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-							if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-								if is_value_type(inner_type, enum_name) {
-									return Some(quote! {
-										if let Some(ref value) = #field_name {
-											value.#check_method()?;
-										}
-									});
-								}
-							}
-						}
-					}
-					_ => {
-						// Direct Value type (like Self, Value<S>)
-						if is_value_type(field_type, enum_name) {
-							return Some(quote! {
-								#field_name.#check_method()?;
-							});
-						}
+					});
+				}
+			}
+			_ => {
+				// Direct Value type (like Self, Value<S>)
+				if is_value_type(field_type, enum_name) {
+					return Some(quote! {
+						#field_name.#check_method()?;
+					});
+				}
 
-						// Check for unknown generic types that contain Self/Value types
-						if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-							for arg in &args.args {
-								if let syn::GenericArgument::Type(inner_type) = arg {
-									if contains_value_type(inner_type, enum_name) {
-										// Error: unsupported generic type containing Self/Value
-										let type_name = &segment.ident;
-										return Some(quote! {
-											compile_error!(concat!(
-												"Unsupported field type: ",
-												stringify!(#type_name),
-												" containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. ",
-												"Field: ",
-												stringify!(#field_name)
-											));
-										});
-									}
-								}
-							}
+				// Check for unknown generic types that contain Self/Value types
+				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+					for arg in &args.args {
+						if let syn::GenericArgument::Type(inner_type) = arg
+							&& contains_value_type(inner_type, enum_name)
+						{
+							// Error: unsupported generic type containing Self/Value
+							let type_name = &segment.ident;
+							return Some(quote! {
+								compile_error!(concat!(
+									"Unsupported field type: ",
+									stringify!(#type_name),
+									" containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. ",
+									"Field: ",
+									stringify!(#field_name)
+								));
+							});
 						}
 					}
 				}
 			}
 		}
-		_ => {}
 	}
 	None
 }
@@ -137,14 +131,14 @@ pub fn contains_value_type(ty: &syn::Type, enum_name: &Ident) -> bool {
 			}
 
 			// Then check if any generic arguments contain Value types
-			if let Some(segment) = type_path.path.segments.last() {
-				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-					for arg in &args.args {
-						if let syn::GenericArgument::Type(inner_type) = arg {
-							if contains_value_type(inner_type, enum_name) {
-								return true;
-							}
-						}
+			if let Some(segment) = type_path.path.segments.last()
+				&& let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+			{
+				for arg in &args.args {
+					if let syn::GenericArgument::Type(inner_type) = arg
+						&& contains_value_type(inner_type, enum_name)
+					{
+						return true;
 					}
 				}
 			}

@@ -28,8 +28,8 @@ fn main() {
 
 	for res in [ok_result, err_result] {
 		match res {
-			StringResult::Ok { value } => println!("Got: {}", value),
-			StringResult::Err { error } => println!("Error: {}", error),
+			StringResult::Ok { value } => println!("Got: {value}"),
+			StringResult::Err { error } => println!("Error: {error}"),
 		}
 	}
 }

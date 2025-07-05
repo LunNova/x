@@ -54,14 +54,14 @@ fn test_union_with_pattern_types() {
 	let value: FlexValue = atom.into();
 	match &value {
 		FlexValue::CoreAtoms(CoreAtoms::Level0) => {}
-		_ => panic!("Expected CoreAtoms::Level0, got {:?}", value),
+		_ => panic!("Expected CoreAtoms::Level0, got {value:?}"),
 	}
 
 	let ty_cons = TypeConstructors::Star { level: 0 };
 	let value2: FlexValue = ty_cons.into();
 	match &value2 {
 		FlexValue::TypeConstructors(TypeConstructors::Star { level: 0 }) => {}
-		_ => panic!("Expected TypeConstructors::Star {{ level: 0 }}, got {:?}", value2),
+		_ => panic!("Expected TypeConstructors::Star {{ level: 0 }}, got {value2:?}"),
 	}
 
 	let complex = ComplexTerms::Lambda {
@@ -77,7 +77,7 @@ fn test_union_with_pattern_types() {
 			}
 			_ => panic!("Expected Lambda variant"),
 		},
-		_ => panic!("Expected ComplexTerms variant, got {:?}", value3),
+		_ => panic!("Expected ComplexTerms variant, got {value3:?}"),
 	}
 
 	// Test inline variants
@@ -88,7 +88,7 @@ fn test_union_with_pattern_types() {
 		FlexValue::Literal { _value } => {
 			assert_eq!(_value.as_str(), "test");
 		}
-		_ => panic!("Expected Literal variant, got {:?}", literal),
+		_ => panic!("Expected Literal variant, got {literal:?}"),
 	}
 
 	// Test pattern restrictions
@@ -100,7 +100,7 @@ fn test_union_with_pattern_types() {
 		FlexValue::Literal { _value } => {
 			assert_eq!(_value.as_str(), "strict");
 		}
-		_ => panic!("Expected Literal variant after conversion, got {:?}", as_flex),
+		_ => panic!("Expected Literal variant after conversion, got {as_flex:?}"),
 	}
 
 	match as_flex.try_to_strict() {
@@ -115,8 +115,7 @@ fn test_union_with_pattern_types() {
 
 	// Test conditional variant (should fail conversion)
 	let stuck = FlexValue::StuckEvaluation { _never: () };
-	match stuck.try_to_strict() {
-		Ok(_) => panic!("StuckEvaluation should not convert to strict"),
-		Err(_) => {} // Expected - StuckEvaluation is correctly rejected
+	if stuck.try_to_strict().is_ok() {
+		panic!("StuckEvaluation should not convert to strict")
 	}
 }

@@ -26,7 +26,7 @@ fn test_union_with_generics() {
 	let empty: Container<i32> = Container::Empty;
 	match &empty {
 		Container::Empty => {}
-		_ => panic!("Expected Container::Empty, got {:?}", empty),
+		_ => panic!("Expected Container::Empty, got {empty:?}"),
 	}
 
 	let some = Container::Some { value: 42 };
@@ -34,7 +34,7 @@ fn test_union_with_generics() {
 		Container::Some { value } => {
 			assert_eq!(*value, 42);
 		}
-		_ => panic!("Expected Container::Some {{ value: 42 }}, got {:?}", some),
+		_ => panic!("Expected Container::Some {{ value: 42 }}, got {some:?}"),
 	}
 
 	// Test union with generics - Container<T> becomes a single variant in MyResult
@@ -46,7 +46,7 @@ fn test_union_with_generics() {
 		MyResult::Container(Container::Some { value }) => {
 			assert_eq!(value, "hello");
 		}
-		_ => panic!("Expected MyResult::Container(Some {{ value: \"hello\" }}), got {:?}", ok),
+		_ => panic!("Expected MyResult::Container(Some {{ value: \"hello\" }}), got {ok:?}"),
 	}
 
 	let err: MyResult<String, &str> = MyResult::Error { error: "failed" };
@@ -54,7 +54,7 @@ fn test_union_with_generics() {
 		MyResult::Error { error } => {
 			assert_eq!(*error, "failed");
 		}
-		_ => panic!("Expected MyResult::Error {{ error: \"failed\" }}, got {:?}", err),
+		_ => panic!("Expected MyResult::Error {{ error: \"failed\" }}, got {err:?}"),
 	}
 
 	// Test From trait with generics
@@ -64,6 +64,6 @@ fn test_union_with_generics() {
 		MyResult::Container(Container::Many { values }) => {
 			assert_eq!(values, &vec![1, 2, 3]);
 		}
-		_ => panic!("Expected MyResult::Container(Many {{ values: [1, 2, 3] }}), got {:?}", result),
+		_ => panic!("Expected MyResult::Container(Many {{ values: [1, 2, 3] }}), got {result:?}"),
 	}
 }

@@ -16,7 +16,7 @@ pub fn generate_from_traits(output: &mut TokenStream2, enum_decl: &EnumDeclarati
 			CompositionPart::TypeRef(type_name, generics) => {
 				let type_name_str = type_name.to_string();
 				// Skip if this variant is conditional (filtered out)
-				if conditional_variants.map_or(true, |cv| !cv.contains(&type_name_str)) {
+				if conditional_variants.is_none_or(|cv| !cv.contains(&type_name_str)) {
 					let impl_generics = enum_decl.full_generics();
 					let target_type = enum_decl.enum_type();
 					let enum_name = &enum_decl.name;
@@ -33,7 +33,7 @@ pub fn generate_from_traits(output: &mut TokenStream2, enum_decl: &EnumDeclarati
 			CompositionPart::BoxedTypeRef(type_name) => {
 				let type_name_str = type_name.to_string();
 				// Skip if this variant is conditional (filtered out)
-				if conditional_variants.map_or(true, |cv| !cv.contains(&type_name_str)) {
+				if conditional_variants.is_none_or(|cv| !cv.contains(&type_name_str)) {
 					let impl_generics = enum_decl.full_generics();
 					let target_type = enum_decl.enum_type();
 					let enum_name = &enum_decl.name;
@@ -87,7 +87,7 @@ where
 			quote! { #name { #(#field_tokens),* } }
 		}
 		Some(VariantFields::Unnamed(types)) => {
-			let transformed_types: Vec<_> = types.iter().map(|t| type_transformer(t)).collect();
+			let transformed_types: Vec<_> = types.iter().map(type_transformer).collect();
 			quote! { #name(#(#transformed_types),*) }
 		}
 	}
@@ -106,28 +106,24 @@ where
 
 			// Fix the path segments recursively
 			for segment in &mut new_path.path.segments {
-				match &mut segment.arguments {
-					syn::PathArguments::AngleBracketed(args) => {
-						// Check each type argument
-						for arg in &mut args.args {
-							if let syn::GenericArgument::Type(inner_ty) = arg {
-								// Recursively fix inner types
-								let fixed = recursive_fixer(inner_ty);
-								*inner_ty = syn::parse2(fixed).unwrap_or_else(|_| inner_ty.clone());
-							}
+				if let syn::PathArguments::AngleBracketed(args) = &mut segment.arguments {
+					// Check each type argument
+					for arg in &mut args.args {
+						if let syn::GenericArgument::Type(inner_ty) = arg {
+							// Recursively fix inner types
+							let fixed = recursive_fixer(inner_ty);
+							*inner_ty = syn::parse2(fixed).unwrap_or_else(|_| inner_ty.clone());
 						}
 					}
-					_ => {}
 				}
 			}
 
 			// Check if this is a direct reference that needs fixing
-			if let Some(segment) = new_path.path.segments.last() {
-				if segment.arguments.is_empty() {
-					if let Some(replacement) = identifier_fixer(&segment.ident) {
-						return replacement;
-					}
-				}
+			if let Some(segment) = new_path.path.segments.last()
+				&& segment.arguments.is_empty()
+				&& let Some(replacement) = identifier_fixer(&segment.ident)
+			{
+				return replacement;
 			}
 
 			quote! { #new_path }
@@ -157,7 +153,7 @@ pub fn fix_concrete_references(ty: &syn::Type, enum_map: &HashMap<String, &EnumD
 			if let Some(enum_decl) = enum_map.get(&ident.to_string()) {
 				if enum_decl.pattern_param.is_some() {
 					// Only add unrestricted type parameter for enums with pattern support
-					let unrestricted_type_name = syn::Ident::new(&format!("{}Type", ident), ident.span());
+					let unrestricted_type_name = syn::Ident::new(&format!("{ident}Type"), ident.span());
 					Some(quote! { #ident<#unrestricted_type_name> })
 				} else {
 					// Simple enums should be referenced without generic parameters

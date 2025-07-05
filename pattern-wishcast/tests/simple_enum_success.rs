@@ -17,5 +17,5 @@ pattern_wishcast! {
 
 fn main() {
 	let c = Color::Blue { intensity: 255 };
-	println!("Color: {:?}", c);
+	println!("Color: {c:?}");
 }

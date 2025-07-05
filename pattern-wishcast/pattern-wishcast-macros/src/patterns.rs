@@ -21,12 +21,12 @@ pub fn generate_strictness_system(
 	let strictness_trait_name = if let Some((_, trait_name)) = &enum_decl.pattern_param {
 		trait_name.clone()
 	} else {
-		syn::Ident::new(&format!("{}Strictness", enum_name), enum_name.span())
+		syn::Ident::new(&format!("{enum_name}Strictness"), enum_name.span())
 	};
 
 	let mut strictness_assoc_types = Vec::new();
 	for conditional_variant in conditional_variants {
-		let assoc_type_name = syn::Ident::new(&format!("{}Allowed", conditional_variant), enum_name.span());
+		let assoc_type_name = syn::Ident::new(&format!("{conditional_variant}Allowed"), enum_name.span());
 		strictness_assoc_types.push(quote! {
 			type #assoc_type_name;
 		});
@@ -40,7 +40,7 @@ pub fn generate_strictness_system(
 
 	// Generate strictness types first so they're available for concrete enum references
 	// Also generate the unrestricted type
-	let unrestricted_type_name = syn::Ident::new(&format!("{}Type", enum_name), enum_name.span());
+	let unrestricted_type_name = syn::Ident::new(&format!("{enum_name}Type"), enum_name.span());
 	output.extend(quote! {
 		#[derive(Debug, Clone, Copy)]
 		pub struct #unrestricted_type_name;
@@ -49,7 +49,7 @@ pub fn generate_strictness_system(
 	// Generate unrestricted trait impl (all variants allowed)
 	let mut unrestricted_assoc_type_impls = Vec::new();
 	for conditional_variant in conditional_variants {
-		let assoc_type_name = syn::Ident::new(&format!("{}Allowed", conditional_variant), enum_name.span());
+		let assoc_type_name = syn::Ident::new(&format!("{conditional_variant}Allowed"), enum_name.span());
 		unrestricted_assoc_type_impls.push(quote! {
 			type #assoc_type_name = ();
 		});
@@ -64,7 +64,7 @@ pub fn generate_strictness_system(
 	// Generate pattern-specific strictness types
 	for pattern_type in pattern_types {
 		let pattern_name = &pattern_type.name;
-		let strictness_type_name = syn::Ident::new(&format!("{}Type", pattern_name), pattern_name.span());
+		let strictness_type_name = syn::Ident::new(&format!("{pattern_name}Type"), pattern_name.span());
 
 		// Generate strictness type
 		output.extend(quote! {
@@ -75,12 +75,12 @@ pub fn generate_strictness_system(
 		// Generate strictness trait impl
 		let mut assoc_type_impls = Vec::new();
 		for conditional_variant in conditional_variants {
-			let assoc_type_name = syn::Ident::new(&format!("{}Allowed", conditional_variant), enum_name.span());
+			let assoc_type_name = syn::Ident::new(&format!("{conditional_variant}Allowed"), enum_name.span());
 
 			let allowed = match &pattern_type.pattern {
 				VariantPattern::Wildcard => quote! { () },
 				VariantPattern::Variants(variants) => {
-					if variants.iter().any(|v| v.to_string() == *conditional_variant) {
+					if variants.iter().any(|v| *v == *conditional_variant) {
 						quote! { () }
 					} else {
 						quote! { ! }
@@ -103,7 +103,7 @@ pub fn generate_strictness_system(
 	// Generate type aliases
 	for pattern_type in pattern_types {
 		let pattern_name = &pattern_type.name;
-		let strictness_type_name = syn::Ident::new(&format!("{}Type", pattern_name), pattern_name.span());
+		let strictness_type_name = syn::Ident::new(&format!("{pattern_name}Type"), pattern_name.span());
 
 		// Generate type alias
 		output.extend(quote! {

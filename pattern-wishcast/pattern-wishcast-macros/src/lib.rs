@@ -73,11 +73,12 @@ impl VariantPattern {
 			if lookahead.peek(syn::Ident) {
 				// Try to parse an identifier to see if it's "if"
 				let fork = input.fork();
-				if let Ok(ident) = fork.parse::<syn::Ident>() {
-					if ident == "if" {
-						return Err(input
-							.error("Guard patterns with 'if' are not supported. Guards will require native pattern types support in Rust."));
-					}
+				if let Ok(ident) = fork.parse::<syn::Ident>()
+					&& ident == "if"
+				{
+					return Err(
+						input.error("Guard patterns with 'if' are not supported. Guards will require native pattern types support in Rust.")
+					);
 				}
 			}
 		}
@@ -272,7 +273,7 @@ impl Parse for AdtItem {
 			if fork.peek(Token![impl]) {
 				Ok(AdtItem::SubtypeImpl(input.parse()?))
 			} else {
-				return Err(input.error("Expected 'enum', 'type', or 'impl' declaration"));
+				Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
 			}
 		} else {
 			Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
@@ -354,10 +355,7 @@ impl Parse for EnumBody {
 					return Err(content.error("Expected ',' between variants"));
 				}
 			}
-			let mut parts = Vec::new();
-			parts.push(CompositionPart::InlineVariants { variants });
-
-			Ok(EnumBody(parts))
+			Ok(EnumBody(vec![CompositionPart::InlineVariants { variants }]))
 		} else {
 			// Direct syntax: = TypeRef | TypeRef | { ... }
 			let mut parts = Vec::new();
@@ -435,13 +433,12 @@ impl Parse for SubtypeImplDeclaration {
 				})?;
 
 				for meta in nested {
-					if let NestedMeta::Meta(meta) = meta {
-						if meta.path().is_ident("SubtypingRelation") {
-							// Use darling to parse the SubtypingRelation
-							let subtyping_rel =
-								SubtypingRelation::from_meta(&meta).map_err(|e| syn::Error::new_spanned(&meta, e.to_string()))?;
-							attributes.push(SubtypeAttribute::SubtypingRelation(subtyping_rel));
-						}
+					if let NestedMeta::Meta(meta) = meta
+						&& meta.path().is_ident("SubtypingRelation")
+					{
+						// Use darling to parse the SubtypingRelation
+						let subtyping_rel = SubtypingRelation::from_meta(&meta).map_err(|e| syn::Error::new_spanned(&meta, e.to_string()))?;
+						attributes.push(SubtypeAttribute::SubtypingRelation(subtyping_rel));
 					}
 				}
 			}
@@ -703,7 +700,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 
 					if conditional_variants.contains(&variant_name_str) {
 						// Conditional enum-as-variant as tuple (value, trait_assoc_type)
-						let never_field_name = syn::Ident::new(&format!("{}Allowed", variant_name_str), variant_name.span());
+						let never_field_name = syn::Ident::new(&format!("{variant_name_str}Allowed"), variant_name.span());
 
 						// Preserve original field type for type references (including Box<T>)
 						let original_field_type = if let Some(VariantFields::Unnamed(types)) = &variant.fields {
@@ -734,7 +731,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 					}
 				} else if conditional_variants.contains(&variant_name_str) {
 					// Conditional variant with _never field
-					let never_field_name = syn::Ident::new(&format!("{}Allowed", variant_name_str), variant_name.span());
+					let never_field_name = syn::Ident::new(&format!("{variant_name_str}Allowed"), variant_name.span());
 					let mut new_variant = variant.clone();
 
 					match &mut new_variant.fields {
@@ -901,7 +898,7 @@ fn generate_subtype_conversions(
 						}
 						Some(VariantFields::Unnamed(types)) => {
 							let field_names: Vec<_> = (0..types.len())
-								.map(|i| syn::Ident::new(&format!("field_{}", i), variant_name.span()))
+								.map(|i| syn::Ident::new(&format!("field_{i}"), variant_name.span()))
 								.collect();
 							let field_checks: Vec<_> = types
 								.iter()
@@ -1170,19 +1167,16 @@ fn generate_test_value_for_type(
 		Ok(quote! { "test".to_string() })
 	} else if type_str.contains("Box<") {
 		// For Box<T>, recursively generate the inner value
-		if let syn::Type::Path(type_path) = ty {
-			if let Some(segment) = type_path.path.segments.last() {
-				if segment.ident == "Box" {
-					if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-						if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-							let inner_value = generate_test_value_for_type(inner_ty, enum_map)?;
-							return Ok(quote! { Box::new(#inner_value) });
-						}
-					}
-				}
-			}
+		if let syn::Type::Path(type_path) = ty
+			&& let Some(segment) = type_path.path.segments.last()
+			&& segment.ident == "Box"
+			&& let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+			&& let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+		{
+			let inner_value = generate_test_value_for_type(inner_ty, enum_map)?;
+			return Ok(quote! { Box::new(#inner_value) });
 		}
-		Err(format!("Could not parse Box type: {}", type_str))
+		Err(format!("Could not parse Box type: {type_str}"))
 	} else if type_str.contains("Vec<") {
 		Ok(quote! { vec![] })
 	} else if type_str.contains("i32") || type_str.contains("i64") {
@@ -1205,15 +1199,15 @@ fn generate_test_value_for_type(
 					let type_ident = syn::Ident::new(&type_name, variant_name.span());
 					Ok(quote! { #type_ident::#variant_name })
 				} else {
-					Err(format!("No unit variant found in enum {}", type_name))
+					Err(format!("No unit variant found in enum {type_name}"))
 				}
 			} else {
-				Err(format!("Unknown type: {}", type_name))
+				Err(format!("Unknown type: {type_name}"))
 			}
 		} else {
-			Err(format!("Complex path type not supported: {}", type_str))
+			Err(format!("Complex path type not supported: {type_str}"))
 		}
 	} else {
-		Err(format!("Unsupported type for test generation: {}", type_str))
+		Err(format!("Unsupported type for test generation: {type_str}"))
 	}
 }

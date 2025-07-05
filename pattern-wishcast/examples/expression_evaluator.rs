@@ -81,6 +81,12 @@ pub struct EvalContext {
 	variables: std::collections::HashMap<String, PartialValue>,
 }
 
+impl Default for EvalContext {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl EvalContext {
 	pub fn new() -> Self {
 		let mut ctx = Self {
@@ -98,7 +104,7 @@ impl EvalContext {
 	fn add_builtin(&mut self, name: String) {
 		// Create a builtin function marker
 		let builtin = PartialValue::Function {
-			param: format!("builtin_{}", name),
+			param: format!("builtin_{name}"),
 			body: Box::new(PartialValue::unbound_var("builtin_implementation".to_string())),
 			captured_env: std::collections::HashMap::new(),
 		};
@@ -121,7 +127,7 @@ impl std::fmt::Display for EvalContext {
 
 		writeln!(f, "{{")?;
 		for (name, value) in sorted_vars {
-			writeln!(f, "  {} = {}", name, value)?;
+			writeln!(f, "  {name} = {value}")?;
 		}
 		write!(f, "}}")
 	}
@@ -130,32 +136,32 @@ impl std::fmt::Display for EvalContext {
 impl<P: PatternFields> std::fmt::Display for Value<P> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Value::Number { value } => write!(f, "{}", value),
+			Value::Number { value } => write!(f, "{value}"),
 			Value::Boolean { value } => write!(f, "{}", if *value { "true" } else { "false" }),
-			Value::Text { value } => write!(f, "\"{}\"", value),
+			Value::Text { value } => write!(f, "\"{value}\""),
 			Value::Tuple { elements } => {
 				write!(f, "(")?;
 				for (i, elem) in elements.iter().enumerate() {
 					if i > 0 {
 						write!(f, ", ")?;
 					}
-					write!(f, "{}", elem)?;
+					write!(f, "{elem}")?;
 				}
 				write!(f, ")")
 			}
 			Value::Function { param, .. } => {
 				if param.starts_with("builtin_") {
 					let builtin_name = param.strip_prefix("builtin_").unwrap();
-					write!(f, "⟨builtin: {}⟩", builtin_name)
+					write!(f, "⟨builtin: {builtin_name}⟩")
 				} else {
-					write!(f, "λ{}.⟨function⟩", param)
+					write!(f, "λ{param}.⟨function⟩")
 				}
 			}
 			Value::StuckEvaluation(stuck, _) => match stuck {
-				StuckEvaluation::Var { id } => write!(f, "?{}", id),
-				StuckEvaluation::UnboundVariable { name } => write!(f, "?{}", name),
+				StuckEvaluation::Var { id } => write!(f, "?{id}"),
+				StuckEvaluation::UnboundVariable { name } => write!(f, "?{name}"),
 				StuckEvaluation::Application { func, arg } => {
-					write!(f, "({}{})", func, arg)
+					write!(f, "({func}{arg})")
 				}
 			},
 		}
@@ -178,7 +184,7 @@ impl CompleteValue {
 
 	pub fn tuple(elements: Vec<CompleteValue>) -> Self {
 		// Convert each complete value to Self (which preserves completeness)
-		let complete_elements: Vec<CompleteValue> = elements.into_iter().map(|elem| elem).collect();
+		let complete_elements: Vec<CompleteValue> = elements.into_iter().collect();
 		CompleteValue::Tuple {
 			elements: complete_elements,
 		}
@@ -333,18 +339,15 @@ impl PartialValue {
 
 	/// Check if this value is complete (fully evaluated, no stuck states)
 	pub fn is_complete(&self) -> bool {
-		match self.try_to_complete_ref() {
-			Ok(_) => true,
-			Err(_) => false,
-		}
+		self.try_to_complete_ref().is_ok()
 	}
 }
 
 /// Helper function to evaluate an expression and print the result
 fn eval_and_print(expr: PartialValue, ctx: &EvalContext) -> PartialValue {
-	print!("\n{}", expr);
+	print!("\n{expr}");
 	let result = expr.eval(ctx);
-	println!("  = {}", result);
+	println!("  = {result}");
 	println!("  is_complete() = {}", result.is_complete());
 	result
 }
@@ -363,7 +366,7 @@ fn main() {
 	ctx.bind("x".to_string(), CompleteValue::number(100).to_partial());
 	ctx.bind("y".to_string(), CompleteValue::number(25).to_partial());
 
-	println!("\nEvaluation Context: {}", ctx);
+	println!("\nEvaluation Context: {ctx}");
 
 	// Create a stuck computation: add(x, 5) where x is unbound
 	let unbound_x = PartialValue::unbound_var("x".to_string());

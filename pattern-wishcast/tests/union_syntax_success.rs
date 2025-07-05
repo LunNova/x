@@ -39,7 +39,7 @@ fn test_union_syntax() {
 	let inferrable: InferrableTerm = atom.into();
 	match &inferrable {
 		InferrableTerm::CoreAtoms(CoreAtoms::Level0) => {}
-		_ => panic!("Expected CoreAtoms::Level0, got {:?}", inferrable),
+		_ => panic!("Expected CoreAtoms::Level0, got {inferrable:?}"),
 	}
 
 	let pi = TypeConstructors::Pi {
@@ -52,7 +52,7 @@ fn test_union_syntax() {
 			assert_eq!(param_type.as_str(), "A");
 			assert_eq!(result_type.as_str(), "B");
 		}
-		_ => panic!("Expected TypeConstructors::Pi, got {:?}", inferrable2),
+		_ => panic!("Expected TypeConstructors::Pi, got {inferrable2:?}"),
 	}
 
 	// Test inline variant
@@ -65,7 +65,7 @@ fn test_union_syntax() {
 			assert_eq!(func.as_str(), "f");
 			assert_eq!(arg.as_str(), "x");
 		}
-		_ => panic!("Expected Application variant, got {:?}", app),
+		_ => panic!("Expected Application variant, got {app:?}"),
 	}
 
 	// Test boxed type reference
@@ -74,8 +74,8 @@ fn test_union_syntax() {
 	match &typed {
 		TypedTerm::TypeConstructors(boxed) => match boxed.as_ref() {
 			TypeConstructors::Star { level: 0 } => {}
-			_ => panic!("Expected Star {{ level: 0 }}, got {:?}", boxed),
+			_ => panic!("Expected Star {{ level: 0 }}, got {boxed:?}"),
 		},
-		_ => panic!("Expected TypeConstructors variant, got {:?}", typed),
+		_ => panic!("Expected TypeConstructors variant, got {typed:?}"),
 	}
 }

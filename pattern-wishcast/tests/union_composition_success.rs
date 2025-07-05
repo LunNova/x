@@ -71,7 +71,7 @@ fn test_union_composition_syntax() {
 	let inferrable: InferrableTerm = atom.into();
 	match &inferrable {
 		InferrableTerm::CoreAtoms(CoreAtoms::Level0) => {}
-		_ => panic!("Expected CoreAtoms::Level0, got {:?}", inferrable),
+		_ => panic!("Expected CoreAtoms::Level0, got {inferrable:?}"),
 	}
 
 	// Test TypeConstructors conversion
@@ -79,7 +79,7 @@ fn test_union_composition_syntax() {
 	let inferrable2: InferrableTerm = ty_cons.into();
 	match &inferrable2 {
 		InferrableTerm::TypeConstructors(TypeConstructors::Star { level: 0 }) => {}
-		_ => panic!("Expected TypeConstructors::Star {{ level: 0 }}, got {:?}", inferrable2),
+		_ => panic!("Expected TypeConstructors::Star {{ level: 0 }}, got {inferrable2:?}"),
 	}
 
 	// Test inline variant creation
@@ -92,7 +92,7 @@ fn test_union_composition_syntax() {
 			assert_eq!(term.as_str(), "term");
 			assert_eq!(type_ann.as_str(), "type");
 		}
-		_ => panic!("Expected Annotated variant, got {:?}", annotated),
+		_ => panic!("Expected Annotated variant, got {annotated:?}"),
 	}
 
 	// Test boxed type reference
@@ -109,7 +109,7 @@ fn test_union_composition_syntax() {
 			}
 			_ => panic!("Expected Lambda variant"),
 		},
-		_ => panic!("Expected TypedTermComplex variant, got {:?}", typed),
+		_ => panic!("Expected TypedTermComplex variant, got {typed:?}"),
 	}
 
 	// Test pure union
@@ -119,6 +119,6 @@ fn test_union_composition_syntax() {
 		FlexValue::StrictValue(StrictValue::HostValue { value }) => {
 			assert_eq!(value, "test");
 		}
-		_ => panic!("Expected StrictValue::HostValue, got {:?}", flex),
+		_ => panic!("Expected StrictValue::HostValue, got {flex:?}"),
 	}
 }
