@@ -12,7 +12,10 @@ repository = "https://github.com/LunNova/x"
 license = "MIT"
 
 [dependencies]
-pattern-wishcast-impl = { path = "pattern-wishcast-impl", version = "0.0.1-alpha.0" }
+pattern-wishcast-macros = { path = "pattern-wishcast-macros", version = "0.0.1-alpha.0" }
 
 [dev-dependencies]
 trybuild = "1.0"
+
+[package.metadata.workspaces]
+independent = true

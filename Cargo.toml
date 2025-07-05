@@ -5,7 +5,7 @@
 [workspace]
 members = [
     "pattern-wishcast",
-    "pattern-wishcast/pattern-wishcast-impl",
+    "pattern-wishcast/pattern-wishcast-macros",
 ]
 resolver = "2"
 

@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "pattern-wishcast-impl"
-description = "impl crate for pattern_wishcast! proc macro in pattern-wishcast"
-version = "0.0.1-alpha.0"
+name = "pattern-wishcast-macros"
+description = "proc macro crate for pattern-wishcast"
+version = "0.0.1-alpha.1"
 edition = "2024"
 repository = "https://github.com/LunNova/x"
 rust-version = "1.89"
@@ -20,3 +20,6 @@ syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
 darling = "0.20"
+
+[package.metadata.workspaces]
+independent = true
