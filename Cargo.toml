@@ -4,8 +4,9 @@
 
 [workspace]
 members = [
-    "pattern-wishcast",
-    "pattern-wishcast/pattern-wishcast-macros",
+	"cargo-derive-doc",
+	"pattern-wishcast",
+	"pattern-wishcast/pattern-wishcast-macros",
 ]
 resolver = "2"
 
