@@ -249,7 +249,7 @@ fn match_expansions_with_diff(original: &str, expanded: &str) -> Result<HashMap<
 			if !is_obvious_derive_impl(&sig) {
 				// Get the span of this item in the expanded source
 				let span = item.span();
-				let line_number = get_line_number(span).unwrap_or(0);
+				let line_number = span.start().line;
 				new_items_with_spans.push((line_number, sig));
 			}
 		}
@@ -571,28 +571,18 @@ fn inject_comments(source: &str, _ast: &File, expansions: &HashMap<String, Vec<S
 
 	// Find where to inject comments for each item with derives (existing logic)
 	for item in &cleaned_ast.items {
-		match item {
-			Item::Struct(s) => {
-				if let Some(expansion_items) = expansions.get(&s.ident.to_string())
-					&& let Some(derive_attr) = find_derive_attr(&s.attrs)
-				{
-					let span = derive_attr.span();
-					if let Some(line) = get_line_number(span) {
-						injection_points.push((line, expansion_items.clone()));
-					}
-				}
-			}
-			Item::Enum(e) => {
-				if let Some(expansion_items) = expansions.get(&e.ident.to_string())
-					&& let Some(derive_attr) = find_derive_attr(&e.attrs)
-				{
-					let span = derive_attr.span();
-					if let Some(line) = get_line_number(span) {
-						injection_points.push((line, expansion_items.clone()));
-					}
-				}
-			}
-			_ => {}
+		let (ident, attrs) = match item {
+			Item::Struct(s) => (&s.ident, &s.attrs),
+			Item::Enum(e) => (&e.ident, &e.attrs),
+			_ => continue,
+		};
+
+		if let Some(expansion_items) = expansions.get(&ident.to_string())
+			&& let Some(derive_attr) = attrs.iter().find(|attr| attr.path().is_ident("derive"))
+		{
+			let span = derive_attr.span();
+			let line = span.start().line;
+			injection_points.push((line, expansion_items.clone()));
 		}
 	}
 
@@ -652,16 +642,6 @@ fn remove_existing_comments(source: &str) -> (String, bool) {
 	}
 
 	(result_lines.join("\n"), removed_any)
-}
-
-fn find_derive_attr(attrs: &[Attribute]) -> Option<&Attribute> {
-	attrs.iter().find(|attr| attr.path().is_ident("derive"))
-}
-
-fn get_line_number(span: proc_macro2::Span) -> Option<usize> {
-	// Use span-locations feature to get line info
-	let start = span.start();
-	Some(start.line)
 }
 
 fn format_expansion_comment(items: &[String]) -> String {
