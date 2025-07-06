@@ -242,22 +242,22 @@ fn match_expansions_with_diff(original: &str, expanded: &str) -> Result<HashMap<
 	// Find new items in the expanded AST
 	let mut new_items_with_spans = Vec::new();
 	for item in &expanded_ast.items {
-		if !contains_item(&original_ast, item) {
-			if let Some(sig) = item_signature(item) {
-				// Filter out common derive trait implementations that are obvious
-				if !is_obvious_derive_impl(&sig) {
-					// Get the span of this item in the expanded source
-					let span = item.span();
-					let line_number = get_line_number(span).unwrap_or(0);
-					new_items_with_spans.push((line_number, sig));
-				}
+		if !contains_item(&original_ast, item)
+			&& let Some(sig) = item_signature(item)
+		{
+			// Filter out common derive trait implementations that are obvious
+			if !is_obvious_derive_impl(&sig) {
+				// Get the span of this item in the expanded source
+				let span = item.span();
+				let line_number = get_line_number(span).unwrap_or(0);
+				new_items_with_spans.push((line_number, sig));
 			}
 		}
 	}
 
 	eprintln!("Found {} new items with spans:", new_items_with_spans.len());
 	for (line, sig) in &new_items_with_spans {
-		eprintln!("  Line {}: {}", line, sig);
+		eprintln!("  Line {line}: {sig}");
 	}
 
 	// Now map these back to macro calls using diff analysis
@@ -271,7 +271,7 @@ fn map_items_to_macro_calls(
 ) -> Result<HashMap<String, Vec<String>>> {
 	// Parse original source to find macro call spans
 	let original_ast = parse_file(original)?;
-	let macro_call_ranges = find_macro_call_ranges(&original_ast, original)?;
+	let macro_call_ranges = find_macro_call_ranges(&original_ast)?;
 
 	eprintln!("Found {} macro calls in original:", macro_call_ranges.len());
 	for (name, range) in &macro_call_ranges {
@@ -295,18 +295,12 @@ fn map_items_to_macro_calls(
 
 	for (expanded_line, item_sig) in new_items_with_spans {
 		for ele in &diff_blocks {
-			if ele.expanded_range.contains(&expanded_line) {
-				if let Some(macro_call) = &ele.macro_call {
-					eprintln!(
-						"Item '{}' at expanded line {} traces back to macro call '{}'",
-						item_sig, expanded_line, macro_call
-					);
-					macro_to_items
-						.entry(format!("{}!", macro_call))
-						.or_insert_with(Vec::new)
-						.push(item_sig);
-					break;
-				}
+			if ele.expanded_range.contains(&expanded_line)
+				&& let Some(macro_call) = &ele.macro_call
+			{
+				eprintln!("Item '{item_sig}' at expanded line {expanded_line} traces back to macro call '{macro_call}'");
+				macro_to_items.entry(format!("{macro_call}!")).or_default().push(item_sig);
+				break;
 			}
 		}
 	}
@@ -314,24 +308,23 @@ fn map_items_to_macro_calls(
 	Ok(macro_to_items)
 }
 
-fn find_macro_call_ranges(ast: &File, source: &str) -> Result<Vec<(String, (usize, usize))>> {
+fn find_macro_call_ranges(ast: &File) -> Result<Vec<(String, (usize, usize))>> {
 	let mut macro_calls = Vec::new();
-	let lines: Vec<&str> = source.lines().collect();
 
 	// Walk through all items in the AST looking for TOP-LEVEL macro calls only
 	// Don't descend into function bodies since macros there can't generate external items
 	for item in &ast.items {
-		find_macro_calls_in_item(item, &lines, &mut macro_calls);
+		find_macro_calls_in_item(item, &mut macro_calls);
 	}
 
 	Ok(macro_calls)
 }
 
-fn find_macro_calls_in_item(item: &Item, lines: &[&str], macro_calls: &mut Vec<(String, (usize, usize))>) {
+fn find_macro_calls_in_item(item: &Item, macro_calls: &mut Vec<(String, (usize, usize))>) {
 	match item {
 		Item::Macro(macro_item) => {
 			// This is a top-level macro call
-			if let Some((macro_name, start_line, end_line)) = extract_macro_call_info_from_macro(macro_item, lines) {
+			if let Some((macro_name, start_line, end_line)) = extract_macro_call_info_from_macro(macro_item) {
 				macro_calls.push((macro_name, (start_line, end_line)));
 			}
 		}
@@ -339,7 +332,7 @@ fn find_macro_calls_in_item(item: &Item, lines: &[&str], macro_calls: &mut Vec<(
 			// Recursively search inside modules
 			if let Some((_, items)) = &mod_item.content {
 				for item in items {
-					find_macro_calls_in_item(item, lines, macro_calls);
+					find_macro_calls_in_item(item, macro_calls);
 				}
 			}
 		}
@@ -349,7 +342,7 @@ fn find_macro_calls_in_item(item: &Item, lines: &[&str], macro_calls: &mut Vec<(
 	}
 }
 
-fn extract_macro_call_info_from_macro(macro_item: &syn::ItemMacro, _lines: &[&str]) -> Option<(String, usize, usize)> {
+fn extract_macro_call_info_from_macro(macro_item: &syn::ItemMacro) -> Option<(String, usize, usize)> {
 	// Get the macro name
 	if let Some(macro_name) = macro_item.mac.path.get_ident() {
 		let span = macro_item.span();
