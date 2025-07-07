@@ -1,0 +1,9 @@
+error[E0599]: no method named `to_partial_mut` found for mutable reference `&mut CompleteValue` in the current scope
+  --> tests/ui/upcast_mut_unsound.rs:30:47
+   |
+30 |     let partial_mut: &mut PartialValue = complete.to_partial_mut();
+   |                                                    ^^^^^^^^^^^^^^ method not found in `&mut CompleteValue`
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0599`.
