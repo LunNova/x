@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
+
 //! A DIY implementation of what pattern_wishcast expands to
 enum PatternableResult<P: ResultVariantPresence, O, E> {
 	// 2nd arg is either () or !.

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 LunNova
 //
 // SPDX-License-Identifier: MIT
+
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "never_type", feature(never_type))]
 

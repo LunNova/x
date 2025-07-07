@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
 
 use pattern_wishcast::pattern_wishcast;
 
