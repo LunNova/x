@@ -7,7 +7,7 @@ enum PatternableResult<P: ResultVariantPresence, O, E> {
 	// 2nd arg is either () or !.
 	// If it's ! it's uninhabited so this variant can't be constructed and doesn't need to be matched
 	Ok(O, P::Ok),
-	Err(E, P::Err),
+	_Err(E, P::Err),
 }
 type AnyResult<O, E> = PatternableResult<AnyResultVariantPresence, O, E>;
 type OkResult<O, E> = PatternableResult<OkResultVariantPresence, O, E>;
