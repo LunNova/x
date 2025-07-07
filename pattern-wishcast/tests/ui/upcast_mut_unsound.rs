@@ -47,9 +47,8 @@ fn main() {
 		CompleteValue::Some(n) => {
 			println!("Value: {}", n);
 			return;
-		}
-		// This pattern is supposedly unreachable by the type system,
-		// but we just put a None in there!
+		} // This pattern is supposedly unreachable by the type system,
+		  // but we just put a None in there!
 	}
 
 	unreachable!("Should not be possible to reach this");

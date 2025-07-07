@@ -944,7 +944,7 @@ fn generate_subtype_conversions(
 			// Generate method names
 			let upcast_ident = rel.upcast.clone();
 			let upcast_ref_ident = syn::Ident::new(&format!("{}_ref", rel.upcast), subtype.span());
-			let upcast_mut_ident = syn::Ident::new(&format!("{}_mut", rel.upcast), subtype.span());
+			// NOTE: We don't generate upcast_mut_ident because mutable upcasts are unsound
 
 			let downcast_ident = rel.downcast.clone();
 			let downcast_ref_ident = syn::Ident::new(&format!("{}_ref", rel.downcast), supertype.span());
@@ -965,9 +965,10 @@ fn generate_subtype_conversions(
 						unsafe { std::mem::transmute(self) }
 					}
 
-					pub fn #upcast_mut_ident(&mut self) -> &mut #supertype {
-						unsafe { std::mem::transmute(self) }
-					}
+					// NOTE: We intentionally do NOT generate an upcast_mut method
+					// Upcasting &mut SubType to &mut SuperType is unsound!
+					// It would allow writing SuperType-only variants through the reference,
+					// violating SubType's invariants.
 				}
 			});
 
@@ -1026,7 +1027,6 @@ fn generate_subtyping_tests(
 			// Generate method names
 			let upcast_ident = &rel.upcast;
 			let upcast_ref_ident = syn::Ident::new(&format!("{}_ref", rel.upcast), subtype.span());
-			let upcast_mut_ident = syn::Ident::new(&format!("{}_mut", rel.upcast), subtype.span());
 			let downcast_ident = &rel.downcast;
 
 			// Generate test function name
@@ -1129,9 +1129,6 @@ fn generate_subtyping_tests(
 						let flex_ref: &#supertype = strict_for_ref.#upcast_ref_ident();
 						assert!(matches!(flex_ref, #match_pattern), "Reference conversion failed");
 
-						// Test mutable reference conversion
-						let flex_mut: &mut #supertype = strict_for_ref.#upcast_mut_ident();
-						assert!(matches!(flex_mut, #match_pattern), "Mutable reference conversion failed");
 
 						// Test pointer identity
 						let strict_ptr = &strict_for_ref as *const _ as usize;

@@ -17,7 +17,11 @@ here's to hoping that demonstrating the usefulness of predicate subtyping with t
 compile-time subtyping relationships between enums with conditionally uninhabited variants. hopefully probably maybe safe transmute-based conversions. miri seems happy.
 
 ```rust
-pattern_wishcast! {
+#![feature(never_type)]
+pattern_wishcast::pattern_wishcast! {
+    enum StuckEvaluation = {
+      BoundVar(String)
+    };
     enum Value is <P: PatternFields> = StuckEvaluation | {
         Number { value: i32 },
         Boolean { value: bool },
@@ -25,7 +29,7 @@ pattern_wishcast! {
     };
 
     // Complete values: no stuck states
-    type CompleteValue = Value is Number { .. } | Boolean { .. } | ...;
+    type CompleteValue = Value is Number { .. } | Boolean { .. };
 
     // with real pattern types we wouldn't need explicit wildcards
     type PartialValue = Value is _;
@@ -37,11 +41,22 @@ pattern_wishcast! {
 
 generates transmute-based upcasts and runtime-checked downcasts. auto-generated safety tests.
 
+### safety note: no mutable reference upcasting
+
+When you use `#[derive(SubtypingRelation(upcast=foo, downcast=bar))]`, the macro generates:
+- `foo(self) -> SuperType` - upcast owned value
+- `foo_ref(&self) -> &SuperType` - upcast immutable reference
+
+Why no mutable reference upcasting? Because upcasting `&mut SubType` to `&mut SuperType` would allow:
+1. Writing a `SuperType`-only variant through the upcast reference
+2. Violating `SubType`'s invariant that certain variants are uninhabited
+3. Undefined behavior when the value is used as `SubType` again
+
 ## limitations
 
 - only patterns that make entire variants conditional work. can't restrict a field to a range like real rust patterns
 - downcast gen has builtin support for only `Vec<T>`, `Box<T>`, `Option<T>` for generic containers containing Value types
-	- requires #[unsafe_transmute_check(iter = ".values()")] for custom containers, don't mess up or you'll transmute never types into existence
+  - requires `#[unsafe_transmute_check(iter = ".values()")]` for custom containers, don't mess up or you'll transmute never types into existence
 
 ## examples
 
