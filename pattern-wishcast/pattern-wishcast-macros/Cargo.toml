@@ -9,7 +9,7 @@ description = "proc macro crate for pattern-wishcast"
 version = "0.0.1-pre.2"
 edition = "2024"
 repository = "https://github.com/LunNova/x"
-rust-version = "1.89"
+rust-version = "1.85"
 license = "MIT"
 
 [lib]

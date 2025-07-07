@@ -1,36 +1,36 @@
 error[E0599]: no method named `to_partial_mut` found for enum `Value` in the current scope
-  --> tests/ui/upcast_mut_unsound.rs:36:48
+  --> tests/ui/upcast_mut_unsound.rs:35:48
    |
-6  | / pattern_wishcast! {
-7  | |     // Define a base value enum that can be None or Some
-8  | |     enum Value is <P: PatternFields> = {
-9  | |         None,
+5  | / pattern_wishcast! {
+6  | |     // Define a base value enum that can be None or Some
+7  | |     enum Value is <P: PatternFields> = {
+8  | |         None,
 ...  |
-21 | |     impl CompleteValue : PartialValue;
-22 | | }
+20 | |     impl CompleteValue : PartialValue;
+21 | | }
    | |_- method `to_partial_mut` not found for this enum
 ...
-36 |       let partial_mut: &mut PartialValue = complete.to_partial_mut();
+35 |       let partial_mut: &mut PartialValue = complete.to_partial_mut();
    |                                                     ^^^^^^^^^^^^^^
    |
 help: there is a method `to_partial` with a similar name
    |
-36 -     let partial_mut: &mut PartialValue = complete.to_partial_mut();
-36 +     let partial_mut: &mut PartialValue = complete.to_partial();
+35 -     let partial_mut: &mut PartialValue = complete.to_partial_mut();
+35 +     let partial_mut: &mut PartialValue = complete.to_partial();
    |
 
 warning: unreachable statement
-  --> tests/ui/upcast_mut_unsound.rs:55:2
+  --> tests/ui/upcast_mut_unsound.rs:53:2
    |
-46 | /     match complete {
-47 | |         CompleteValue::Some(n) => {
-48 | |             println!("Value: {}", n);
-49 | |             return;
+45 | /     match complete {
+46 | |         CompleteValue::Some(n) => {
+47 | |             println!("Value: {}", n);
+48 | |             return;
 ...  |
-53 | |     }
+51 | |     }
    | |_____- any code following this `match` expression is unreachable, as all arms diverge
-54 |
-55 |       unreachable!("Should not be possible to reach this");
+52 |
+53 |       unreachable!("Should not be possible to reach this");
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
    |
    = note: `#[warn(unreachable_code)]` on by default

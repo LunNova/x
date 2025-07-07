@@ -83,7 +83,7 @@ pub fn generate_strictness_system(
 					if variants.iter().any(|v| *v == *conditional_variant) {
 						quote! { () }
 					} else {
-						quote! { ! }
+						quote! { ::pattern_wishcast::Never }
 					}
 				}
 			};

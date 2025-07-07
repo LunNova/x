@@ -4,8 +4,6 @@
 
 //! Test helpful error for single pattern type with no conditional variants
 
-#![feature(never_type)]
-
 use pattern_wishcast::pattern_wishcast;
 
 pattern_wishcast! {

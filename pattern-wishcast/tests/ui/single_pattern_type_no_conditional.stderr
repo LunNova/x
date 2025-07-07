@@ -1,13 +1,13 @@
 error: Enum `Value` has only one pattern type `MyValue`. Since there are no conditional variants, you don't need pattern support. Remove `is <P: PatternFields>` from the enum declaration and use a simple type alias instead: `type MyValue = Value;`
-  --> tests/ui/single_pattern_type_no_conditional.rs:11:1
+  --> tests/ui/single_pattern_type_no_conditional.rs:9:1
    |
-11 | / pattern_wishcast! {
-12 | |     enum Value is <P: PatternFields> = {
-13 | |         HostValue { value: String },
-14 | |         TupleValue { elements: Vec<Self> },
+9  | / pattern_wishcast! {
+10 | |     enum Value is <P: PatternFields> = {
+11 | |         HostValue { value: String },
+12 | |         TupleValue { elements: Vec<Self> },
 ...  |
-18 | |     type MyValue = Value is HostValue(_) | TupleValue(_);
-19 | | }
+16 | |     type MyValue = Value is HostValue(_) | TupleValue(_);
+17 | | }
    | |_^
    |
    = note: this error originates in the macro `pattern_wishcast` (in Nightly builds, run with -Z macro-backtrace for more info)

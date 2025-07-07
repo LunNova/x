@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MPL-2.0
-#![feature(never_type)]
 
 use pattern_wishcast::pattern_wishcast;
 

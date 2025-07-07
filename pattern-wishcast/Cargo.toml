@@ -7,12 +7,18 @@ name = "pattern-wishcast"
 description = "Pattern types emulation for conditional variants using conditional never types"
 version = "0.0.1-pre.2"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.85"
 repository = "https://github.com/LunNova/x"
 license = "MIT"
 
 [dependencies]
 pattern-wishcast-macros = { path = "pattern-wishcast-macros", version = "0.0.1-alpha.0" }
+
+[features]
+# Enable the unstable never type (!). 
+# This requires a nightly compiler and is outside normal semver guarantees.
+# Tracking issue: https://github.com/rust-lang/rust/issues/35121
+never_type = []
 
 [dev-dependencies]
 trybuild = "1.0"

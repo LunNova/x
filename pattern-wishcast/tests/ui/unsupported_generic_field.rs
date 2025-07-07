@@ -4,8 +4,6 @@
 
 //! Test that unsupported generic fields containing Self produce helpful errors
 
-#![feature(never_type)]
-
 use pattern_wishcast::pattern_wishcast;
 use std::collections::HashMap;
 

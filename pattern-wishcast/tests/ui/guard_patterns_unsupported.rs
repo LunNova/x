@@ -4,8 +4,6 @@
 
 //! Test that guard patterns produce helpful error messages
 
-#![feature(never_type)]
-
 use pattern_wishcast::pattern_wishcast;
 
 pattern_wishcast! {

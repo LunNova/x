@@ -4,8 +4,6 @@
 
 //! Test that creating pattern types for enums without pattern support produces helpful errors
 
-#![feature(never_type)]
-
 use pattern_wishcast::pattern_wishcast;
 
 pattern_wishcast! {

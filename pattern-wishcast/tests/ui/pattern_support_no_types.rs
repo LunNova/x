@@ -4,8 +4,6 @@
 
 //! Test error when enum declares pattern support but no pattern types are defined
 
-#![feature(never_type)]
-
 use pattern_wishcast::pattern_wishcast;
 
 pattern_wishcast! {
