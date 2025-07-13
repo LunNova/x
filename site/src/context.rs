@@ -7,14 +7,13 @@ use hyper::body::Bytes;
 use rand::seq::SliceRandom;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
-use std::hash::{DefaultHasher, Hash, Hasher};
 use tera::{Context, Tera};
 use tracing::instrument;
 
 use crate::config::BlogConfig;
 use crate::front_matter::pod_to_json_value;
 use crate::pages::{PageData, PageMetadata};
-use crate::utils::{slugify, slugify_tag};
+use crate::utils::{slugify, slugify_tag, stable_string_hash};
 
 // Context generation aims for Zola compatibility with unified page model:
 // everything is a page, so templates don't need separate handling for
@@ -146,13 +145,10 @@ pub fn context_and_render_page(
 
 	let mut context = generate_page_context(page, &Bytes::from(html_content_for_context), page_data.front_matter.as_ref());
 	let mut badges_shuffled = HashMap::new();
-	let mut rand = {
-		let mut hasher = DefaultHasher::new();
-		page.hash(&mut hasher);
-		<rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(hasher.finish())
-	};
 	for (name, badges) in metadata.badges.iter() {
 		let mut shuffled = badges.clone();
+		let seed = stable_string_hash(page).wrapping_mul(stable_string_hash(name));
+		let mut rand = <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(seed);
 		shuffled.shuffle(&mut rand);
 		badges_shuffled.insert(name.to_string(), shuffled);
 	}

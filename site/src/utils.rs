@@ -63,6 +63,16 @@ pub fn slugify_tag(s: &str) -> String {
 	cleaned.split('-').filter(|part| !part.is_empty()).collect::<Vec<_>>().join("-")
 }
 
+/// Simple, stable hash function for strings that won't change across Rust versions.
+/// Uses a basic polynomial rolling hash with a fixed prime.
+pub fn stable_string_hash(s: &str) -> u64 {
+	let mut hash = 0u64;
+	for chr in s.chars() {
+		hash = hash.wrapping_mul(31).wrapping_add(chr as u64);
+	}
+	hash
+}
+
 pub fn process_links(content: &str) -> (String, Vec<String>) {
 	let mut links = Vec::new();
 	let processed = LINK_REGEX
@@ -78,6 +88,15 @@ pub fn process_links(content: &str) -> (String, Vec<String>) {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn test_stable_string_hash() {
+		assert_eq!(stable_string_hash("test"), stable_string_hash("test"));
+		assert_ne!(stable_string_hash("test"), stable_string_hash("different"));
+		assert_eq!(stable_string_hash(""), 0);
+		assert_eq!(stable_string_hash("a"), 'a' as u64);
+		assert_eq!(stable_string_hash("b"), 'b' as u64);
+	}
 
 	#[test]
 	fn test_process_links_preserves_trailing_spaces() {
