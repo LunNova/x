@@ -175,16 +175,20 @@ fn setup_opentelemetry() {
 	if use_otlp {
 		let otlp_endpoint = std::env::var("OTLP_ENDPOINT").unwrap_or_else(|_| "http://log-target:3333".to_string());
 
-		let tracer = opentelemetry_otlp::new_pipeline()
-			.tracing()
-			.with_exporter(opentelemetry_otlp::new_exporter().http().with_endpoint(otlp_endpoint))
-			.with_trace_config(
-				opentelemetry_sdk::trace::Config::default().with_resource(opentelemetry_sdk::Resource::new(vec![
-					opentelemetry::KeyValue::new("service.name", env!("CARGO_PKG_NAME")),
-				])),
+		let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+			.with_batch_exporter(
+				opentelemetry_otlp::SpanExporter::builder()
+					.with_http()
+					.with_endpoint(otlp_endpoint)
+					.build()
+					.unwrap(),
 			)
-			.install_batch(opentelemetry_sdk::runtime::Tokio)
-			.unwrap()
+			.with_resource(
+				opentelemetry_sdk::Resource::builder()
+					.with_service_name(env!("CARGO_PKG_NAME"))
+					.build(),
+			)
+			.build()
 			.tracer(module_path!());
 
 		let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
