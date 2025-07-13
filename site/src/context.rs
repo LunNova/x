@@ -223,24 +223,25 @@ pub fn context_and_render_page(
 		}
 
 		if let Some(Pod::Hash(taxonomies)) = fm_map.get("taxonomies")
-			&& let Some(Pod::Array(categories)) = taxonomies.get("categories") {
-				let category_objects: Vec<serde_json::Value> = categories
-					.iter()
-					.filter_map(|c| {
-						if let Pod::String(cat_name) = c {
-							let cat_slug = slugify(cat_name);
-							Some(serde_json::json!({
-								"name": cat_name,
-								"slug": cat_slug,
-								"permalink": format!("{}/categories/{}/", config.site.base_url.trim_end_matches('/'), cat_slug)
-							}))
-						} else {
-							None
-						}
-					})
-					.collect();
-				page_obj.insert("categories".to_string(), serde_json::Value::Array(category_objects));
-			}
+			&& let Some(Pod::Array(categories)) = taxonomies.get("categories")
+		{
+			let category_objects: Vec<serde_json::Value> = categories
+				.iter()
+				.filter_map(|c| {
+					if let Pod::String(cat_name) = c {
+						let cat_slug = slugify(cat_name);
+						Some(serde_json::json!({
+							"name": cat_name,
+							"slug": cat_slug,
+							"permalink": format!("{}/categories/{}/", config.site.base_url.trim_end_matches('/'), cat_slug)
+						}))
+					} else {
+						None
+					}
+				})
+				.collect();
+			page_obj.insert("categories".to_string(), serde_json::Value::Array(category_objects));
+		}
 
 		if let Some(page_metadata) = metadata.pages_metadata.get(page) {
 			let tag_objects: Vec<serde_json::Value> = page_metadata

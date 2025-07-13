@@ -2,62 +2,152 @@
 //
 // SPDX-License-Identifier: MIT
 
-use html5ever::parse_document;
-use html5ever::serialize::{SerializeOpts, serialize};
-use html5ever::tendril::{StrTendril, TendrilSink};
-use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
+use html5ever::Attribute;
+use html5ever::tokenizer::{BufferQueue, EndTag, StartTag, Token, TokenSink, Tokenizer, TokenizerOpts};
+use markup5ever::TokenizerResult;
+use std::cell::RefCell;
 use std::default::Default;
 use url::Url;
 
-/// Rewrite URLs in HTML content to convert relative and site-relative URLs to absolute URLs
-pub fn rewrite_urls(html: &str, base_url: &str, current_path: &str) -> Result<String, Box<dyn std::error::Error>> {
-	let dom = parse_document(RcDom::default(), Default::default())
-		.from_utf8()
-		.read_from(&mut html.as_bytes())?;
-
-	let site_base = Url::parse(base_url)?;
-
-	let current_url = site_base.join(current_path)?;
-
-	walk_and_rewrite(&dom.document, &site_base, &current_url);
-
-	let mut html_output = Vec::new();
-	serialize(
-		&mut html_output,
-		&SerializableHandle::from(dom.document.clone()),
-		SerializeOpts::default(),
-	)?;
-
-	let result = String::from_utf8(html_output)?;
-
-	Ok(result)
+struct UrlRewritingTokenSink {
+	output: RefCell<String>,
+	site_base: Url,
+	current_url: Url,
 }
 
-fn walk_and_rewrite(handle: &Handle, site_base: &Url, current_url: &Url) {
-	let node = handle;
-
-	if let NodeData::Element { ref name, ref attrs, .. } = node.data {
-		let tag_name = &*name.local;
-
-		let mut attrs = attrs.borrow_mut();
-		for attr in attrs.iter_mut() {
-			let attr_name = &*attr.name.local;
-
-			let should_rewrite = match attr_name {
-				"href" | "src" => true,
-				"action" => tag_name == "form",
-				_ => false,
-			};
-
-			if should_rewrite && let Ok(rewritten) = rewrite_single_url(&attr.value, site_base, current_url) {
-				attr.value = StrTendril::from(rewritten);
-			}
+impl UrlRewritingTokenSink {
+	fn new(site_base: Url, current_url: Url) -> Self {
+		Self {
+			output: RefCell::new(String::new()),
+			site_base,
+			current_url,
 		}
 	}
 
-	for child in node.children.borrow().iter() {
-		walk_and_rewrite(child, site_base, current_url);
+	fn should_rewrite_attr(tag_name: &str, attr_name: &str) -> bool {
+		match attr_name {
+			"href" | "src" => true,
+			"action" => tag_name == "form",
+			_ => false,
+		}
 	}
+
+	fn write_start_tag(&self, name: &str, attrs: &[Attribute], self_closing: bool) {
+		let mut output = self.output.borrow_mut();
+		output.push('<');
+		output.push_str(name);
+
+		for attr in attrs {
+			output.push(' ');
+			output.push_str(&attr.name.local);
+			output.push_str("=\"");
+
+			let value = if Self::should_rewrite_attr(name, &attr.name.local) {
+				rewrite_single_url(&attr.value, &self.site_base, &self.current_url).unwrap_or_else(|_| attr.value.to_string())
+			} else {
+				attr.value.to_string()
+			};
+
+			output.push_str(&html_escape(&value));
+			output.push('"');
+		}
+
+		if self_closing {
+			output.push_str(" />");
+		} else {
+			output.push('>');
+		}
+	}
+
+	fn write_end_tag(&self, name: &str) {
+		let mut output = self.output.borrow_mut();
+		output.push_str("</");
+		output.push_str(name);
+		output.push('>');
+	}
+}
+
+fn html_escape(s: &str) -> String {
+	s.replace('&', "&amp;")
+		.replace('<', "&lt;")
+		.replace('>', "&gt;")
+		.replace('"', "&quot;")
+		.replace('\'', "&#39;")
+}
+
+impl TokenSink for UrlRewritingTokenSink {
+	type Handle = ();
+
+	fn process_token(&self, token: Token, _line_number: u64) -> html5ever::tokenizer::TokenSinkResult<Self::Handle> {
+		use html5ever::tokenizer::TokenSinkResult;
+
+		match token {
+			Token::TagToken(tag) => match tag.kind {
+				StartTag => self.write_start_tag(&tag.name, &tag.attrs, tag.self_closing),
+				EndTag => self.write_end_tag(&tag.name),
+			},
+			Token::CommentToken(comment) => {
+				let mut output = self.output.borrow_mut();
+				output.push_str("<!--");
+				output.push_str(&comment);
+				output.push_str("-->");
+			}
+			Token::CharacterTokens(chars) => {
+				let mut output = self.output.borrow_mut();
+				output.push_str(&html_escape(&chars));
+			}
+			Token::DoctypeToken(doctype) => {
+				let mut output = self.output.borrow_mut();
+				output.push_str("<!DOCTYPE ");
+				if let Some(name) = doctype.name {
+					output.push_str(&name);
+				}
+				if let Some(public_id) = doctype.public_id {
+					output.push_str(" PUBLIC \"");
+					output.push_str(&public_id);
+					output.push('"');
+					if let Some(system_id) = doctype.system_id {
+						output.push_str(" \"");
+						output.push_str(&system_id);
+						output.push('"');
+					}
+				} else if let Some(system_id) = doctype.system_id {
+					output.push_str(" SYSTEM \"");
+					output.push_str(&system_id);
+					output.push('"');
+				}
+				output.push('>');
+			}
+			Token::NullCharacterToken => {}
+			Token::EOFToken => {}
+			Token::ParseError(err) => {
+				panic!("HTML parse error: {err}");
+			}
+		}
+
+		TokenSinkResult::Continue
+	}
+}
+
+/// Rewrite URLs in HTML content to convert relative and site-relative URLs to absolute URLs
+pub fn rewrite_urls(html: &str, base_url: &str, current_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+	let site_base = Url::parse(base_url)?;
+	let current_url = site_base.join(current_path)?;
+
+	let sink = UrlRewritingTokenSink::new(site_base, current_url);
+	let tokenizer = Tokenizer::new(sink, TokenizerOpts::default());
+
+	let input = BufferQueue::default();
+	input.push_back(html.into());
+
+	loop {
+		match tokenizer.feed(&input) {
+			TokenizerResult::Done => break,
+			TokenizerResult::Script(_) => continue, // Script tokens irrelevant for URL rewriting
+		}
+	}
+
+	Ok(tokenizer.sink.output.into_inner())
 }
 
 fn rewrite_single_url(url_str: &str, site_base: &Url, current_url: &Url) -> Result<String, Box<dyn std::error::Error>> {
