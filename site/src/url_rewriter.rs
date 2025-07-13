@@ -2,6 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! URL rewriter for HTML content.
+//!
+//! **WARNING**: This module is tested enough to work with non-hostile data for a personal site,
+//! but is not intended to handle arbitrary possibly malicious HTML. Unfortunately, we can't make
+//! use of html5ever_rcdom to build a DOM and HtmlSerializer to translate it back because rcdom
+//! is marked unsafe and untested, leaving us with no good way to rely on html5ever's serializer
+//! that would reliably know how to turn tags back into HTML. This implementation uses the
+//! tokenizer directly and manually reconstructs HTML, which works for well-formed content but
+//! may have edge cases with malicious or malformed input.
+
 use html5ever::Attribute;
 use html5ever::tokenizer::{BufferQueue, EndTag, StartTag, Token, TokenSink, Tokenizer, TokenizerOpts};
 use markup5ever::TokenizerResult;
@@ -13,6 +23,7 @@ struct UrlRewritingTokenSink {
 	output: RefCell<String>,
 	site_base: Url,
 	current_url: Url,
+	in_raw_tag: RefCell<bool>,
 }
 
 impl UrlRewritingTokenSink {
@@ -21,6 +32,7 @@ impl UrlRewritingTokenSink {
 			output: RefCell::new(String::new()),
 			site_base,
 			current_url,
+			in_raw_tag: RefCell::new(false),
 		}
 	}
 
@@ -83,8 +95,18 @@ impl TokenSink for UrlRewritingTokenSink {
 
 		match token {
 			Token::TagToken(tag) => match tag.kind {
-				StartTag => self.write_start_tag(&tag.name, &tag.attrs, tag.self_closing),
-				EndTag => self.write_end_tag(&tag.name),
+				StartTag => {
+					self.write_start_tag(&tag.name, &tag.attrs, tag.self_closing);
+					if &*tag.name == "script" || &*tag.name == "style" {
+						*self.in_raw_tag.borrow_mut() = true;
+					}
+				}
+				EndTag => {
+					if &*tag.name == "script" || &*tag.name == "style" {
+						*self.in_raw_tag.borrow_mut() = false;
+					}
+					self.write_end_tag(&tag.name);
+				}
 			},
 			Token::CommentToken(comment) => {
 				let mut output = self.output.borrow_mut();
@@ -94,7 +116,11 @@ impl TokenSink for UrlRewritingTokenSink {
 			}
 			Token::CharacterTokens(chars) => {
 				let mut output = self.output.borrow_mut();
-				output.push_str(&html_escape(&chars));
+				if *self.in_raw_tag.borrow() {
+					output.push_str(&chars);
+				} else {
+					output.push_str(&html_escape(&chars));
+				}
 			}
 			Token::DoctypeToken(doctype) => {
 				let mut output = self.output.borrow_mut();
@@ -260,6 +286,39 @@ mod tests {
 		assert!(result.contains(r#"href="https://example.com/css/style.css""#));
 		assert!(result.contains(r#"href="https://example.com/blog/post/favicon.ico""#));
 		assert!(result.contains(r#"href="https://example.com/blog/fonts/font.woff2""#));
+	}
+
+	#[test]
+	fn test_html_entities_preserved() {
+		let html = r#"<p>This has &lt;tags&gt; and &quot;quotes&quot; and &amp;amp; entities.</p>"#;
+		let result = rewrite_urls(html, "https://example.com", "/").unwrap();
+
+		assert!(result.contains("&lt;tags&gt;"));
+		assert!(result.contains("&quot;quotes&quot;"));
+		assert!(result.contains("&amp;amp;"));
+	}
+
+	#[test]
+	fn test_mixed_quotes_in_attributes() {
+		let html = r#"<div title="Compiler says &quot;error&quot; but dev's fine" data-test='JSON with "escaped" keys'></div>"#;
+		let result = rewrite_urls(html, "https://example.com", "/").unwrap();
+
+		// Should preserve escaped quotes and convert single quotes to escaped form
+		assert!(result.contains("&quot;error&quot;"));
+		assert!(result.contains("dev&#39;s") || result.contains("dev's"));
+		assert!(result.contains("JSON with &quot;escaped&quot; keys"));
+	}
+
+	#[test]
+	fn test_json_ld_script_tags() {
+		let html = r#"<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"example.com","url":"https://example.com"}
+</script>"#;
+		let result = rewrite_urls(html, "https://example.com", "/").unwrap();
+
+		assert!(result.contains(r#"{"@context":"https://schema.org""#));
+		assert!(!result.contains("&quot;"));
+		assert!(!result.contains("&#39;"));
 	}
 
 	#[test]
