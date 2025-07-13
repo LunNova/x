@@ -16,7 +16,7 @@ httpdate = "1.0.3"
 hyper = { version = "1.4.1", features = ["full", "http1"] }
 hyper-util = "0.1.7"
 mime_guess = "2.0.5"
-notify = "5.0"
+notify = "8.0"
 num_cpus = "1.16.0"
 opentelemetry = "0.24.0"
 opentelemetry-otlp = { version = "0.17.0", features = ["http-proto", "reqwest-client"] }
