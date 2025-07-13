@@ -196,7 +196,7 @@ pub fn markdown_to_html(markdown: &str) -> String {
 					title: "Copy link to this section".into(),
 					id: "".into(),
 				});
-				let copy_icon = Event::Text("🔗".into());
+				let copy_icon = Event::Text("§".into());
 				let copy_link_end = Event::End(pulldown_cmark::TagEnd::Link);
 
 				// Emit the header with generated ID and all its content through normal renderer
@@ -326,12 +326,14 @@ mod tests {
 		let html = markdown_to_html(markdown);
 
 		// Should generate IDs for all headers and include copy links
-		assert!(html.contains("<h1 id=\"hello-world\">Hello World<a href=\"#hello-world\" title=\"Copy link to this section\">🔗</a></h1>"));
+		assert!(html.contains("<h1 id=\"hello-world\">Hello World<a href=\"#hello-world\" title=\"Copy link to this section\">§</a></h1>"));
+		assert!(
+			html.contains(
+				"<h2 id=\"testing-headers\">Testing Headers<a href=\"#testing-headers\" title=\"Copy link to this section\">§</a></h2>"
+			)
+		);
 		assert!(html.contains(
-			"<h2 id=\"testing-headers\">Testing Headers<a href=\"#testing-headers\" title=\"Copy link to this section\">🔗</a></h2>"
-		));
-		assert!(html.contains(
-			"<h3 id=\"multiple-words-here\">Multiple Words Here<a href=\"#multiple-words-here\" title=\"Copy link to this section\">🔗</a></h3>"
+			"<h3 id=\"multiple-words-here\">Multiple Words Here<a href=\"#multiple-words-here\" title=\"Copy link to this section\">§</a></h3>"
 		));
 	}
 
@@ -342,10 +344,8 @@ mod tests {
 		let html = markdown_to_html(markdown);
 
 		// Should use the manually specified IDs and include copy links
-		assert!(
-			html.contains("<h1 id=\"my-custom-id\">Custom Header<a href=\"#my-custom-id\" title=\"Copy link to this section\">🔗</a></h1>")
-		);
-		assert!(html.contains("<h2 id=\"another-id\">Another Header<a href=\"#another-id\" title=\"Copy link to this section\">🔗</a></h2>"));
+		assert!(html.contains("<h1 id=\"my-custom-id\">Custom Header<a href=\"#my-custom-id\" title=\"Copy link to this section\">§</a></h1>"));
+		assert!(html.contains("<h2 id=\"another-id\">Another Header<a href=\"#another-id\" title=\"Copy link to this section\">§</a></h2>"));
 	}
 
 	#[test]
@@ -355,14 +355,12 @@ mod tests {
 		let html = markdown_to_html(markdown);
 
 		// Should use manual IDs where specified, generate for others, all with copy links
-		assert!(html.contains("<h1 id=\"custom\">Manual ID<a href=\"#custom\" title=\"Copy link to this section\">🔗</a></h1>"));
+		assert!(html.contains("<h1 id=\"custom\">Manual ID<a href=\"#custom\" title=\"Copy link to this section\">§</a></h1>"));
 		assert!(
-			html.contains(
-				"<h2 id=\"auto-generated\">Auto Generated<a href=\"#auto-generated\" title=\"Copy link to this section\">🔗</a></h2>"
-			)
+			html.contains("<h2 id=\"auto-generated\">Auto Generated<a href=\"#auto-generated\" title=\"Copy link to this section\">§</a></h2>")
 		);
-		assert!(html.contains("<h3 id=\"specific-id\">Another Manual<a href=\"#specific-id\" title=\"Copy link to this section\">🔗</a></h3>"));
-		assert!(html.contains("<h4 id=\"auto-again\">Auto Again<a href=\"#auto-again\" title=\"Copy link to this section\">🔗</a></h4>"));
+		assert!(html.contains("<h3 id=\"specific-id\">Another Manual<a href=\"#specific-id\" title=\"Copy link to this section\">§</a></h3>"));
+		assert!(html.contains("<h4 id=\"auto-again\">Auto Again<a href=\"#auto-again\" title=\"Copy link to this section\">§</a></h4>"));
 	}
 
 	#[test]
@@ -373,9 +371,9 @@ mod tests {
 
 		// Should clean up special characters and normalize spaces/underscores, with copy links
 		assert!(html.contains(
-			"<h1 id=\"hello-world-more\">Hello, World! &amp; More<a href=\"#hello-world-more\" title=\"Copy link to this section\">🔗</a></h1>"
+			"<h1 id=\"hello-world-more\">Hello, World! &amp; More<a href=\"#hello-world-more\" title=\"Copy link to this section\">§</a></h1>"
 		));
-		assert!(html.contains("<h2 id=\"testing-underscores-and-dashes\">Testing_Underscores-And-Dashes<a href=\"#testing-underscores-and-dashes\" title=\"Copy link to this section\">🔗</a></h2>"));
+		assert!(html.contains("<h2 id=\"testing-underscores-and-dashes\">Testing_Underscores-And-Dashes<a href=\"#testing-underscores-and-dashes\" title=\"Copy link to this section\">§</a></h2>"));
 	}
 
 	#[test]
@@ -385,9 +383,9 @@ mod tests {
 		let html = markdown_to_html(markdown);
 
 		// Should include code content in ID generation and copy links
-		assert!(html.contains("<h1 id=\"using-code-in-headers\">Using <code>code</code> in headers<a href=\"#using-code-in-headers\" title=\"Copy link to this section\">🔗</a></h1>"));
+		assert!(html.contains("<h1 id=\"using-code-in-headers\">Using <code>code</code> in headers<a href=\"#using-code-in-headers\" title=\"Copy link to this section\">§</a></h1>"));
 		assert!(html.contains(
-			"<h2 id=\"the-main-function\">The <code>main</code> function<a href=\"#the-main-function\" title=\"Copy link to this section\">🔗</a></h2>"
+			"<h2 id=\"the-main-function\">The <code>main</code> function<a href=\"#the-main-function\" title=\"Copy link to this section\">§</a></h2>"
 		));
 	}
 }
