@@ -19,6 +19,10 @@ use std::cell::RefCell;
 use std::default::Default;
 use url::Url;
 
+/// URL rewriting token sink implementation.
+///
+/// Note: forced to use RefCell for interior mutability because html5ever's TokenSink trait
+/// takes `&self`. Can't impl TokenSink for &mut UrlRewritingTokenSink, because we get &&mut.
 struct UrlRewritingTokenSink {
 	output: RefCell<String>,
 	site_base: Url,
