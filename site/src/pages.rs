@@ -511,19 +511,41 @@ pub async fn render_site_from_metadata(templates: &mut tera::Tera, metadata: &Pr
 		}
 
 		// Add to sitemap
-		sitemap.push_str(&format!(
-			"\n<url><loc>{}/{}</loc>",
-			config.site.base_url.trim_end_matches('/'),
-			slugified_key
-		));
+		let url = if slugified_key == "/" {
+			config.site.base_url.trim_end_matches('/').to_string()
+		} else {
+			format!("{}/{}", config.site.base_url.trim_end_matches('/'), slugified_key)
+		};
+		sitemap.push_str(&format!("\n<url><loc>{}</loc>", url));
 
 		// Add lastmod if available (prioritize 'updated' over 'date')
-		if let Some(gray_matter::Pod::Hash(fm_map)) = &page_metadata.front_matter {
-			let lastmod_date = fm_map.get("updated").or_else(|| fm_map.get("date"));
+		let mut lastmod_date_str = None;
 
-			if let Some(gray_matter::Pod::String(date)) = lastmod_date {
-				sitemap.push_str(&format!("<lastmod>{date}</lastmod>"));
+		if let Some(gray_matter::Pod::Hash(fm_map)) = &page_metadata.front_matter {
+			if let Some(gray_matter::Pod::String(date)) = fm_map.get("updated").or_else(|| fm_map.get("date")) {
+				lastmod_date_str = Some(date.clone());
 			}
+		}
+
+		// Compare with baseline_date if configured
+		if let Some(baseline) = &config.site.baseline_date {
+			match &lastmod_date_str {
+				Some(page_date) => {
+					// Compare dates and use the more recent one
+					// Assuming YYYY-MM-DD format for comparison
+					if baseline > page_date {
+						lastmod_date_str = Some(baseline.clone());
+					}
+				}
+				None => {
+					// No page date, use baseline
+					lastmod_date_str = Some(baseline.clone());
+				}
+			}
+		}
+
+		if let Some(date) = lastmod_date_str {
+			sitemap.push_str(&format!("<lastmod>{date}</lastmod>"));
 		}
 
 		sitemap.push_str("</url>");

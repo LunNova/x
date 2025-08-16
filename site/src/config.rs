@@ -54,6 +54,7 @@ pub struct SiteConfig {
 	pub base_url: String,
 	pub pages_dir: String,
 	pub description: Option<String>,
+	pub baseline_date: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
