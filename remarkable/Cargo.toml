@@ -1,0 +1,19 @@
+[package]
+name = "remarkable"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "remarkable"
+path = "main.rs"
+
+[dependencies]
+anyhow = "1.0"
+ssh2 = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v5"] }
+nix = { version = "0.29.0", features = ["socket"] }
