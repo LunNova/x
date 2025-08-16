@@ -22,17 +22,17 @@ pub fn parse_front_matter(content: &str) -> (String, Option<Pod>) {
 
 	if content.starts_with("---\n")
 		&& let Some((front_matter_str, body)) = extract_front_matter_content(content, "---")
-		&& let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(front_matter_str)
+		&& let Ok(toml_value) = toml::from_str::<toml::Value>(front_matter_str)
 	{
-		let pod = yaml_value_to_pod(yaml_value);
+		let pod = toml_value_to_pod(toml_value);
 		return (trim_leading_newline(body).to_string(), Some(pod));
 	}
 
 	if content.starts_with("---\n")
 		&& let Some((front_matter_str, body)) = extract_front_matter_content(content, "---")
-		&& let Ok(toml_value) = toml::from_str::<toml::Value>(front_matter_str)
+		&& let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(front_matter_str)
 	{
-		let pod = toml_value_to_pod(toml_value);
+		let pod = yaml_value_to_pod(yaml_value);
 		return (trim_leading_newline(body).to_string(), Some(pod));
 	}
 
@@ -372,5 +372,24 @@ This is the content body."#;
 		let yaml_content = "---\ntitle: Test\n---\n\nYAML content.";
 		let (body4, _) = parse_front_matter(yaml_content);
 		assert_eq!(body4, "YAML content.");
+	}
+
+	#[test]
+	fn test_toml_front_matter_with_yaml_delimiter() {
+		let content = r#"---
+title = "nixpkgs treefmt.withConfig example"
+draft = true
+---
+Lorem ipsum dolor sit amet, consectetur adipiscing elit."#;
+
+		let (body, front_matter) = parse_front_matter(content);
+
+		assert_eq!(body.trim(), "Lorem ipsum dolor sit amet, consectetur adipiscing elit.");
+		let map = assert_front_matter_hash(front_matter);
+		assert_eq!(
+			map.get("title"),
+			Some(&Pod::String("nixpkgs treefmt.withConfig example".to_string()))
+		);
+		assert_eq!(map.get("draft"), Some(&Pod::Boolean(true)));
 	}
 }
