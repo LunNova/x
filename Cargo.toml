@@ -7,6 +7,7 @@ members = [
 	"cargo-derive-doc",
 	"pattern-wishcast",
 	"pattern-wishcast/pattern-wishcast-macros",
+	"remarkable",
 	"site",
 ]
 resolver = "2"
