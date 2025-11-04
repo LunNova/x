@@ -5,6 +5,7 @@
 [workspace]
 members = [
 	"cargo-derive-doc",
+	"nyoomy-build-nix",
 	"pattern-wishcast",
 	"pattern-wishcast/pattern-wishcast-macros",
 	"remarkable",

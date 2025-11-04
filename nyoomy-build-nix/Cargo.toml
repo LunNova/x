@@ -1,0 +1,17 @@
+cargo-features = ["different-binary-name"]
+
+[package]
+name = "nyoomy-build-nix"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "nyoomy-build-nix"
+path = "main.rs"
+filename = "nyoomy-build.nix"
+
+[dependencies]
+argh = "0.1.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
