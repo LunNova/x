@@ -10,6 +10,7 @@ members = [
 	"pattern-wishcast/pattern-wishcast-macros",
 	"remarkable",
 	"site",
+	"scratch",
 ]
 resolver = "2"
 
