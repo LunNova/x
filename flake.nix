@@ -75,6 +75,7 @@
           inherit (self.checks.${pkgs.system}.pre-commit-check) shellHook;
 
           buildInputs = [
+            pkgs.pkg-config
             pkgs.cargo-modules
             pkgs.cargo-nextest
             pkgs.cargo-expand
@@ -82,6 +83,8 @@
             pkgs.cargo-workspaces
             pkgs.cargo-machete
             pkgs.reuse
+            pkgs.openssl.dev
+            pkgs.openssl
             rust-bin
           ];
 
