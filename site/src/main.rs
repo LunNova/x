@@ -49,13 +49,22 @@ fn setup_hot_reload(
 ) {
 	let config = config.clone();
 	tokio::spawn(async move {
-		let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+		let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
 
 		let mut watcher = RecommendedWatcher::new(
-			move |res| {
-				futures::executor::block_on(async {
-					tx.send(res).await.unwrap();
-				});
+			move |res: Result<notify::Event, notify::Error>| {
+				// Filter out Access events (opens, reads) before sending
+				if let Ok(ref event) = res {
+					if event.kind.is_access() {
+						return;
+					}
+				}
+
+				// Use try_send to avoid blocking - during initial setup the receiver
+				// might not be draining fast enough and we don't want to block notify
+				if let Err(e) = tx.try_send(res) {
+					eprintln!("Failed to send file watch event (channel full?): {:?}", e);
+				}
 			},
 			notify::Config::default(),
 		)
@@ -63,18 +72,36 @@ fn setup_hot_reload(
 
 		let theme_dir = config.theme.as_ref().map(|t| t.dir.as_str()).unwrap_or("templates");
 
-		watcher.watch(std::path::Path::new(theme_dir), RecursiveMode::Recursive).unwrap();
-		watcher
-			.watch(std::path::Path::new(&config.site.pages_dir), RecursiveMode::Recursive)
-			.unwrap();
+		let theme_path = std::path::Path::new(theme_dir);
+		if theme_path.exists() {
+			match watcher.watch(theme_path, RecursiveMode::Recursive) {
+				Ok(_) => info!("Watching theme directory: {}", theme_dir),
+				Err(e) => error!("Failed to watch theme directory: {:?}", e),
+			}
+		}
+
+		match watcher.watch(std::path::Path::new(&config.site.pages_dir), RecursiveMode::Recursive) {
+			Ok(_) => info!("Watching pages directory: {}", config.site.pages_dir),
+			Err(e) => {
+				error!("Failed to watch pages directory '{}': {:?}", config.site.pages_dir, e);
+				return;
+			}
+		}
+
 		let static_dir = std::path::Path::new("static");
 		if static_dir.exists() {
-			watcher.watch(static_dir, RecursiveMode::Recursive).unwrap();
+			match watcher.watch(static_dir, RecursiveMode::Recursive) {
+				Ok(_) => info!("Watching static directory: static"),
+				Err(e) => error!("Failed to watch static directory: {:?}", e),
+			}
 		}
 
 		let theme_static_dir = std::path::Path::new(theme_dir).join("static");
 		if theme_static_dir.exists() {
-			watcher.watch(&theme_static_dir, RecursiveMode::Recursive).unwrap();
+			match watcher.watch(&theme_static_dir, RecursiveMode::Recursive) {
+				Ok(_) => info!("Watching theme static directory: {}", theme_static_dir.display()),
+				Err(e) => error!("Failed to watch theme static directory: {:?}", e),
+			}
 		}
 
 		let mut pending_events: HashSet<std::path::PathBuf> = HashSet::new();
@@ -95,6 +122,8 @@ fn setup_hot_reload(
 
 			match tokio::time::timeout(timeout_duration, rx.recv()).await {
 				Ok(Some(Ok(event))) => {
+					debug!("Received file system event: kind={:?}, paths={:?}", event.kind, event.paths);
+
 					if event.need_rescan() || event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove() {
 						let relevant_paths: Vec<_> = event
 							.paths
