@@ -26,6 +26,9 @@ pub struct ServeArgs {
 	#[argh(positional)]
 	/// path to the blog directory
 	pub blog_dir: String,
+	#[argh(switch)]
+	/// show draft pages (normally hidden in production)
+	pub show_drafts: bool,
 }
 
 #[derive(FromArgs)]

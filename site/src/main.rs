@@ -46,6 +46,7 @@ fn setup_hot_reload(
 	rendered_site: Arc<RwLock<RenderedSite>>,
 	static_files: Arc<RwLock<StaticFiles>>,
 	config: Arc<BlogConfig>,
+	show_drafts: bool,
 ) {
 	let config = config.clone();
 	tokio::spawn(async move {
@@ -171,7 +172,7 @@ fn setup_hot_reload(
 							tera.register_filter("escape_html_attribute", EscapeHtmlAttribute);
 
 							*templates.write().await = tera;
-							let new_rendered_site = preload_pages_data(&mut *templates.write().await, &config).await;
+							let new_rendered_site = preload_pages_data(&mut *templates.write().await, &config, show_drafts).await;
 							*rendered_site.write().await = new_rendered_site;
 						}
 
@@ -294,7 +295,7 @@ impl tera::Filter for EscapeHtmlAttribute {
 	}
 }
 
-async fn setup_templates_and_data(config: &BlogConfig) -> (Arc<RwLock<Tera>>, Arc<RwLock<RenderedSite>>) {
+async fn setup_templates_and_data(config: &BlogConfig, show_drafts: bool) -> (Arc<RwLock<Tera>>, Arc<RwLock<RenderedSite>>) {
 	let theme_dir = config.theme.as_ref().map(|t| t.dir.as_str()).unwrap_or("templates");
 	let templates_pattern = format!("{theme_dir}/templates/**/*");
 	let mut new_tmp = Tera::new(&templates_pattern).unwrap();
@@ -302,23 +303,35 @@ async fn setup_templates_and_data(config: &BlogConfig) -> (Arc<RwLock<Tera>>, Ar
 
 	let templates = Arc::new(RwLock::new(new_tmp));
 
-	let rendered_site = Arc::new(RwLock::new(preload_pages_data(&mut *templates.write().await, config).await));
+	let rendered_site = Arc::new(RwLock::new(
+		preload_pages_data(&mut *templates.write().await, config, show_drafts).await,
+	));
 
 	(templates, rendered_site)
 }
 
 async fn serve_blog(serve_args: ServeArgs) {
+	let show_drafts = serve_args.show_drafts;
 	let mut config = load_blog_config(&serve_args.blog_dir).await;
 
 	Arc::get_mut(&mut config).unwrap().site.base_url = "http://127.0.0.1:3030".to_string();
 
 	info!("Starting blog engine for: {}", config.site.title);
 	info!("Pages directory: {}", config.site.pages_dir);
+	if show_drafts {
+		info!("Draft pages will be shown");
+	}
 
-	let (templates, rendered_site) = setup_templates_and_data(&config).await;
+	let (templates, rendered_site) = setup_templates_and_data(&config, show_drafts).await;
 	let static_files = Arc::new(RwLock::new(preload_static_files(&config).await));
 
-	setup_hot_reload(templates.clone(), rendered_site.clone(), static_files.clone(), config.clone());
+	setup_hot_reload(
+		templates.clone(),
+		rendered_site.clone(),
+		static_files.clone(),
+		config.clone(),
+		show_drafts,
+	);
 
 	let request_context = Arc::new(RequestContext {
 		rendered_site,
@@ -363,7 +376,7 @@ async fn render_static(render_args: RenderArgs) {
 	info!("Pages directory: {}", config.site.pages_dir);
 	info!("Output directory: {}", render_args.output_dir);
 
-	let (_templates, rendered_site) = setup_templates_and_data(&config).await;
+	let (_templates, rendered_site) = setup_templates_and_data(&config, false).await;
 	let static_files = Arc::new(RwLock::new(preload_static_files(&config).await));
 
 	let output_path = Path::new(&render_args.output_dir);

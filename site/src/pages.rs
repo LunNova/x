@@ -163,14 +163,14 @@ fn is_draft(front_matter: &Option<Pod>) -> bool {
 	false
 }
 
-pub async fn load_pages_metadata(pages_dir: &Path) -> BTreeMap<String, PageMetadata> {
+pub async fn load_pages_metadata(pages_dir: &Path, show_drafts: bool) -> BTreeMap<String, PageMetadata> {
 	let all_pages = get_all_pages(pages_dir);
 	let mut metadata = BTreeMap::new();
 
 	for (slugified_key, original_path) in all_pages {
 		let (content, front_matter, last_modified, file_ext) = load_page_content(&original_path, pages_dir.to_str().unwrap()).await;
 
-		if is_draft(&front_matter) {
+		if !show_drafts && is_draft(&front_matter) {
 			continue;
 		}
 
@@ -293,13 +293,13 @@ pub fn get_all_pages(dir: &Path) -> Vec<(String, String)> {
 }
 
 #[instrument(skip(config))]
-pub async fn preload_pages_metadata(config: &BlogConfig) -> PreloadedMetadata {
+pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> PreloadedMetadata {
 	let badges = badges::load_badges().await;
 	let pages_dir = Path::new(&config.site.pages_dir);
 	let all_pages = get_all_pages(pages_dir);
 	let mut page_paths = HashMap::new();
 
-	let mut pages_metadata = load_pages_metadata(pages_dir).await;
+	let mut pages_metadata = load_pages_metadata(pages_dir, show_drafts).await;
 
 	if let Some(tags_metadata) = generate_tags_page_metadata(&pages_metadata) {
 		pages_metadata.insert(slugify("tags"), tags_metadata);
@@ -576,8 +576,8 @@ pub async fn render_site_from_metadata(templates: &mut tera::Tera, metadata: &Pr
 
 // Convenience function that combines both phases
 #[instrument(skip(templates, config))]
-pub async fn preload_pages_data(templates: &mut tera::Tera, config: &BlogConfig) -> RenderedSite {
-	let metadata = preload_pages_metadata(config).await;
+pub async fn preload_pages_data(templates: &mut tera::Tera, config: &BlogConfig, show_drafts: bool) -> RenderedSite {
+	let metadata = preload_pages_metadata(config, show_drafts).await;
 	render_site_from_metadata(templates, &metadata, config).await
 }
 
