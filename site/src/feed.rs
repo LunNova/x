@@ -66,7 +66,7 @@ fn collect_feed_items(config: &BlogConfig, pages_metadata: &BTreeMap<String, Pag
 		})
 		.collect();
 
-	dated_pages.sort_by(|a, b| b.0.cmp(a.0));
+	dated_pages.sort_by(|a, b| crate::pages::canonical_page_cmp(Some(a.0.as_str()), a.1, Some(b.0.as_str()), b.1));
 
 	dated_pages
 		.iter()

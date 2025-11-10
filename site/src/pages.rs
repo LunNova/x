@@ -47,6 +47,30 @@ pub struct PageSummary {
 	pub children: Vec<Arc<PageSummary>>,
 }
 
+impl PageSummary {
+	/// Canonical comparison for page sorting: date descending (newest first), then slug ascending (A→Z)
+	pub fn canonical_cmp(&self, other: &Self) -> std::cmp::Ordering {
+		canonical_page_cmp(self.date.as_deref(), &self.slug, other.date.as_deref(), &other.slug)
+	}
+}
+
+/// Canonical page comparison logic: date descending (newest first), then slug ascending (A→Z)
+/// Dated pages always come before undated pages
+pub fn canonical_page_cmp(a_date: Option<&str>, a_slug: &str, b_date: Option<&str>, b_slug: &str) -> std::cmp::Ordering {
+	match (a_date, b_date) {
+		(Some(a_d), Some(b_d)) => {
+			// Both have dates: newer first (reversed comparison), then slug A→Z
+			match b_d.cmp(a_d) {
+				std::cmp::Ordering::Equal => a_slug.cmp(b_slug),
+				other => other,
+			}
+		}
+		(Some(_), None) => std::cmp::Ordering::Less,    // dated pages before undated
+		(None, Some(_)) => std::cmp::Ordering::Greater, // undated pages after dated
+		(None, None) => a_slug.cmp(b_slug),             // both undated: slug A→Z
+	}
+}
+
 #[derive(Clone)]
 pub struct PreloadedMetadata {
 	pub page_paths: HashMap<String, String>, // slugified_key -> actual_file_path
@@ -358,12 +382,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 				.and_then(|fm| if let Pod::Hash(map) = fm { map.get("date") } else { None })
 				.and_then(|d| if let Pod::String(s) = d { Some(s.as_str()) } else { None });
 
-			match (a_date, b_date) {
-				(Some(a_d), Some(b_d)) => a_d.cmp(b_d),
-				(Some(_), None) => std::cmp::Ordering::Less,
-				(None, Some(_)) => std::cmp::Ordering::Greater,
-				(None, None) => a.cmp(b),
-			}
+			canonical_page_cmp(a_date, a, b_date, b).reverse()
 		});
 		sibling_orders.insert(prefix, pages);
 	}
@@ -423,13 +442,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 			.cloned() // Clone the Arc, not the PageSummary
 			.collect();
 
-		// Sort children by date descending (newest first)
-		children.sort_by(|a, b| match (&b.date, &a.date) {
-			(Some(b_date), Some(a_date)) => b_date.cmp(a_date),
-			(Some(_), None) => std::cmp::Ordering::Less,
-			(None, Some(_)) => std::cmp::Ordering::Greater,
-			(None, None) => b.slug.cmp(&a.slug),
-		});
+		children.sort_by(|a, b| a.canonical_cmp(b));
 
 		page.children = children;
 
