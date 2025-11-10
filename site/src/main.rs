@@ -232,6 +232,13 @@ fn setup_opentelemetry() {
 async fn main() {
 	setup_opentelemetry();
 
+	std::panic::set_hook(Box::new(|panic_info| {
+		eprintln!("!!!! PANIC: {}", panic_info);
+		if let Some(location) = panic_info.location() {
+			eprintln!("!!!! at {}:{}:{}", location.file(), location.line(), location.column());
+		}
+	}));
+
 	let args: Args = argh::from_env();
 
 	match args.command {
