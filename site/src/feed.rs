@@ -60,18 +60,19 @@ fn collect_feed_items(config: &BlogConfig, pages_metadata: &BTreeMap<String, Pag
 					.and_then(|d| if let Pod::String(s) = d { Some(s.as_str()) } else { None })
 					.unwrap_or(&metadata.content[..metadata.content.len().min(200)]);
 
-				return Some((date, path, title, description));
+				let sort_key = crate::pages::PageSortKey::from_metadata(path, metadata);
+				return Some((sort_key, date, path, title, description));
 			}
 			None
 		})
 		.collect();
 
-	dated_pages.sort_by(|a, b| crate::pages::canonical_page_cmp(Some(a.0.as_str()), a.1, Some(b.0.as_str()), b.1));
+	dated_pages.sort_by(|a, b| a.0.cmp(&b.0));
 
 	dated_pages
 		.iter()
 		.take(FEED_ITEM_LIMIT)
-		.map(|(date, path, title, description)| {
+		.map(|(_sort_key, date, path, title, description)| {
 			let link = format!("{}/{}", config.site.base_url.trim_end_matches('/'), path);
 
 			let (categories_rss, categories_atom) = if let Some(metadata) = pages_metadata.get(*path) {

@@ -44,30 +44,75 @@ pub struct PageSummary {
 	pub updated: Option<String>,
 	pub summary: Option<String>,
 	pub reading_time: u32,
+	pub sort_key: i32,
 	pub children: Vec<Arc<PageSummary>>,
 }
 
-impl PageSummary {
-	/// Canonical comparison for page sorting: date descending (newest first), then slug ascending (A→Z)
-	pub fn canonical_cmp(&self, other: &Self) -> std::cmp::Ordering {
-		canonical_page_cmp(self.date.as_deref(), &self.slug, other.date.as_deref(), &other.slug)
+/// Sort key for consistent page ordering across all sorting locations
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageSortKey {
+	pub sort_key: i32,
+	pub date: Option<String>,
+	pub slug: String,
+}
+
+impl PageSortKey {
+	pub fn from_metadata(slug: &str, metadata: &PageMetadata) -> Self {
+		let (sort_key, date) = if let Some(Pod::Hash(map)) = &metadata.front_matter {
+			let sort_key = map
+				.get("sort_key")
+				.and_then(|k| if let Pod::Integer(i) = k { Some(*i as i32) } else { None })
+				.unwrap_or(0);
+			let date = map
+				.get("date")
+				.and_then(|d| if let Pod::String(s) = d { Some(s.clone()) } else { None });
+			(sort_key, date)
+		} else {
+			(0, None)
+		};
+
+		PageSortKey {
+			sort_key,
+			date,
+			slug: slug.to_string(),
+		}
+	}
+
+	pub fn from_summary(summary: &PageSummary) -> Self {
+		PageSortKey {
+			sort_key: summary.sort_key,
+			date: summary.date.clone(),
+			slug: summary.slug.clone(),
+		}
+	}
+
+	/// sort_key ascending, then date descending (newest first), then slug ascending (A→Z)
+	/// Dated pages always come before undated pages
+	pub fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		match self.sort_key.cmp(&other.sort_key) {
+			std::cmp::Ordering::Equal => match (&self.date, &other.date) {
+				(Some(a_d), Some(b_d)) => match b_d.cmp(a_d) {
+					std::cmp::Ordering::Equal => self.slug.cmp(&other.slug),
+					other => other,
+				},
+				(Some(_), None) => std::cmp::Ordering::Less,
+				(None, Some(_)) => std::cmp::Ordering::Greater,
+				(None, None) => self.slug.cmp(&other.slug),
+			},
+			other => other,
+		}
 	}
 }
 
-/// Canonical page comparison logic: date descending (newest first), then slug ascending (A→Z)
-/// Dated pages always come before undated pages
-pub fn canonical_page_cmp(a_date: Option<&str>, a_slug: &str, b_date: Option<&str>, b_slug: &str) -> std::cmp::Ordering {
-	match (a_date, b_date) {
-		(Some(a_d), Some(b_d)) => {
-			// Both have dates: newer first (reversed comparison), then slug A→Z
-			match b_d.cmp(a_d) {
-				std::cmp::Ordering::Equal => a_slug.cmp(b_slug),
-				other => other,
-			}
-		}
-		(Some(_), None) => std::cmp::Ordering::Less,    // dated pages before undated
-		(None, Some(_)) => std::cmp::Ordering::Greater, // undated pages after dated
-		(None, None) => a_slug.cmp(b_slug),             // both undated: slug A→Z
+impl Ord for PageSortKey {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		PageSortKey::cmp(self, other)
+	}
+}
+
+impl PartialOrd for PageSortKey {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
 	}
 }
 
@@ -370,19 +415,12 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 	let mut sibling_orders = HashMap::new();
 	for (prefix, mut pages) in prefix_groups {
 		pages.sort_by(|a, b| {
-			let a_date = pages_metadata
-				.get(a)
-				.and_then(|m| m.front_matter.as_ref())
-				.and_then(|fm| if let Pod::Hash(map) = fm { map.get("date") } else { None })
-				.and_then(|d| if let Pod::String(s) = d { Some(s.as_str()) } else { None });
-
-			let b_date = pages_metadata
-				.get(b)
-				.and_then(|m| m.front_matter.as_ref())
-				.and_then(|fm| if let Pod::Hash(map) = fm { map.get("date") } else { None })
-				.and_then(|d| if let Pod::String(s) = d { Some(s.as_str()) } else { None });
-
-			canonical_page_cmp(a_date, a, b_date, b).reverse()
+			let a_key = pages_metadata.get(a).map(|m| PageSortKey::from_metadata(a, m));
+			let b_key = pages_metadata.get(b).map(|m| PageSortKey::from_metadata(b, m));
+			match (a_key, b_key) {
+				(Some(a), Some(b)) => a.cmp(&b).reverse(),
+				_ => std::cmp::Ordering::Equal,
+			}
 		});
 		sibling_orders.insert(prefix, pages);
 	}
@@ -391,7 +429,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 	let mut all_pages: Vec<PageSummary> = pages_metadata
 		.iter()
 		.map(|(slug, metadata)| {
-			let (description, date, updated, summary) = if let Some(Pod::Hash(map)) = &metadata.front_matter {
+			let (description, date, updated, summary, sort_key) = if let Some(Pod::Hash(map)) = &metadata.front_matter {
 				let description = map
 					.get("description")
 					.and_then(|d| if let Pod::String(s) = d { Some(s.clone()) } else { None });
@@ -404,9 +442,13 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 				let summary = map
 					.get("summary")
 					.and_then(|d| if let Pod::String(s) = d { Some(s.clone()) } else { None });
-				(description, date, updated, summary)
+				let sort_key = map
+					.get("sort_key")
+					.and_then(|k| if let Pod::Integer(i) = k { Some(*i as i32) } else { None })
+					.unwrap_or(0);
+				(description, date, updated, summary, sort_key)
 			} else {
-				(None, None, None, None)
+				(None, None, None, None, 0)
 			};
 
 			PageSummary {
@@ -418,6 +460,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 				updated,
 				summary,
 				reading_time: metadata.reading_time,
+				sort_key,
 				children: Vec::new(),
 			}
 		})
@@ -442,7 +485,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 			.cloned() // Clone the Arc, not the PageSummary
 			.collect();
 
-		children.sort_by(|a, b| a.canonical_cmp(b));
+		children.sort_by_key(|c| PageSortKey::from_summary(c));
 
 		page.children = children;
 
