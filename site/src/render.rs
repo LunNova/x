@@ -21,7 +21,7 @@ static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 static THEME_SET: OnceLock<ThemeSet> = OnceLock::new();
 
 fn get_syntax_set() -> &'static SyntaxSet {
-	SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines)
+	SYNTAX_SET.get_or_init(|| two_face::syntax::extra_newlines())
 }
 
 fn get_theme_set() -> &'static ThemeSet {
