@@ -5,20 +5,36 @@
 # SPDX-License-Identifier: CC0-1.0
 
 set -euo pipefail
-shopt -s globstar
+shopt -s globstar nullglob
 
+if [[ $# -lt 1 ]]; then
+	echo "Usage: $0 <directory>" >&2
+	exit 1
+fi
+
+dir="$1"
 CR="LunNova"
-METADATA_LICENSE=CC0-1.0
-LOCK_LICENSE=$METADATA_LICENSE
-EXPECT_LICENSE=$METADATA_LICENSE
-EXAMPLES_LICENSE=MIT
 LICENSE=MIT
-reuse annotate **.lock --copyright $CR --license $LOCK_LICENSE --fallback-dot-license
-reuse annotate $0 renovate.json5 .editorconfig .gitignore flake.nix *.toml Cargo.toml --copyright $CR --license $METADATA_LICENSE --fallback-dot-license
+METADATA_LICENSE=CC0-1.0
+EXPECT_LICENSE=CC0-1.0
 
-reuse annotate pattern-wishcast/**/*.stderr --copyright "$CR" --license $EXPECT_LICENSE --fallback-dot-license
-reuse annotate pattern-wishcast/**/Cargo.toml pattern-wishcast/**/tests/**.rs pattern-wishcast/**/src/**.rs \
-	--copyright "$CR" --license $LICENSE
-reuse annotate pattern-wishcast/**/examples/**.rs --copyright "$CR" --license $LICENSE
+annotate() {
+	local license="$1"
+	local fallback="$2"
+	shift 2
+	local files=("$@")
+	if [[ ${#files[@]} -gt 0 ]]; then
+		if [[ "$fallback" == "yes" ]]; then
+			reuse annotate "${files[@]}" --copyright "$CR" --license "$license" --fallback-dot-license
+		else
+			reuse annotate "${files[@]}" --copyright "$CR" --license "$license"
+		fi
+	fi
+}
+
+annotate $METADATA_LICENSE yes "$dir"/**/*.lock
+annotate $METADATA_LICENSE yes "$dir"/**/*.toml
+annotate $LICENSE no "$dir"/**/*.rs
+annotate $EXPECT_LICENSE yes "$dir"/**/*.stderr
 
 exec reuse lint
