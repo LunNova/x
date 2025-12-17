@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 LunNova
+//
+// SPDX-License-Identifier: MIT
+
 pattern_wishcast::pattern_wishcast! {
 	// Base expressions that can get stuck during evaluation
 	enum StuckEvaluation = {
