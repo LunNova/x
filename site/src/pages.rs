@@ -577,10 +577,10 @@ pub async fn render_site_from_metadata(templates: &mut tera::Tera, metadata: &Pr
 		// Add lastmod if available (prioritize 'updated' over 'date')
 		let mut lastmod_date_str = None;
 
-		if let Some(gray_matter::Pod::Hash(fm_map)) = &page_metadata.front_matter {
-			if let Some(gray_matter::Pod::String(date)) = fm_map.get("updated").or_else(|| fm_map.get("date")) {
-				lastmod_date_str = Some(date.clone());
-			}
+		if let Some(gray_matter::Pod::Hash(fm_map)) = &page_metadata.front_matter
+			&& let Some(gray_matter::Pod::String(date)) = fm_map.get("updated").or_else(|| fm_map.get("date"))
+		{
+			lastmod_date_str = Some(date.clone());
 		}
 
 		// Compare with baseline_date if configured

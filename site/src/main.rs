@@ -55,10 +55,10 @@ fn setup_hot_reload(
 		let mut watcher = RecommendedWatcher::new(
 			move |res: Result<notify::Event, notify::Error>| {
 				// Filter out Access events (opens, reads) before sending
-				if let Ok(ref event) = res {
-					if event.kind.is_access() {
-						return;
-					}
+				if let Ok(ref event) = res
+					&& event.kind.is_access()
+				{
+					return;
 				}
 
 				// Use try_send to avoid blocking - during initial setup the receiver
