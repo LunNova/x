@@ -321,7 +321,7 @@ async fn serve_blog(serve_args: ServeArgs) {
 	let show_drafts = serve_args.show_drafts;
 	let mut config = load_blog_config(&serve_args.blog_dir).await;
 
-	Arc::get_mut(&mut config).unwrap().site.base_url = "http://127.0.0.1:3030".to_string();
+	Arc::get_mut(&mut config).unwrap().site.base_url = serve_args.domain.unwrap_or_else(|| "http://127.0.0.1:3030".to_string());
 
 	info!("Starting blog engine for: {}", config.site.title);
 	info!("Pages directory: {}", config.site.pages_dir);

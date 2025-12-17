@@ -29,6 +29,9 @@ pub struct ServeArgs {
 	#[argh(switch)]
 	/// show draft pages (normally hidden in production)
 	pub show_drafts: bool,
+	#[argh(option)]
+	/// override the domain name (default: http://127.0.0.1:3030)
+	pub domain: Option<String>,
 }
 
 #[derive(FromArgs)]
