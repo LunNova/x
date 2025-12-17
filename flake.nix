@@ -4,7 +4,7 @@
 
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks = {
       url = "github:cachix/pre-commit-hooks.nix";
@@ -77,6 +77,7 @@
           buildInputs = [
             pkgs.pkg-config
             pkgs.cargo-modules
+            pkgs.cargo-flamegraph
             pkgs.cargo-nextest
             pkgs.cargo-expand
             pkgs.cargo-release
