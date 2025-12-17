@@ -232,15 +232,35 @@ fn is_draft(front_matter: &Option<Pod>) -> bool {
 	false
 }
 
-pub async fn load_pages_metadata(pages_dir: &Path, show_drafts: bool) -> BTreeMap<String, PageMetadata> {
+pub async fn load_pages_metadata(pages_dir: &Path, show_drafts: bool, embed_images_dir: Option<&str>) -> BTreeMap<String, PageMetadata> {
 	let all_pages = get_all_pages(pages_dir);
 	let mut metadata = BTreeMap::new();
 
 	for (slugified_key, original_path) in all_pages {
-		let (content, front_matter, last_modified, file_ext) = load_page_content(&original_path, pages_dir.to_str().unwrap()).await;
+		let (content, mut front_matter, last_modified, file_ext) = load_page_content(&original_path, pages_dir.to_str().unwrap()).await;
 
 		if !show_drafts && is_draft(&front_matter) {
 			continue;
+		}
+
+		// Auto-resolve embed_image if not set
+		if let Some(embed_dir) = embed_images_dir {
+			let has_embed_image = front_matter
+				.as_ref()
+				.and_then(|fm| if let Pod::Hash(map) = fm { map.get("embed_image") } else { None })
+				.is_some();
+
+			if !has_embed_image {
+				let slug_trimmed = slugified_key.trim_end_matches('/');
+				let fs_path = format!("static/{}/{}.png", embed_dir, slug_trimmed);
+
+				if Path::new(&fs_path).exists()
+					&& let Some(Pod::Hash(ref mut map)) = front_matter
+				{
+					let url_path = format!("/{}/{}.png", embed_dir, slug_trimmed);
+					map.insert("embed_image".to_string(), Pod::String(url_path));
+				}
+			}
 		}
 
 		let title = front_matter
@@ -368,7 +388,7 @@ pub async fn preload_pages_metadata(config: &BlogConfig, show_drafts: bool) -> P
 	let all_pages = get_all_pages(pages_dir);
 	let mut page_paths = HashMap::new();
 
-	let mut pages_metadata = load_pages_metadata(pages_dir, show_drafts).await;
+	let mut pages_metadata = load_pages_metadata(pages_dir, show_drafts, config.site.embed_images_dir.as_deref()).await;
 
 	if let Some(tags_metadata) = generate_tags_page_metadata(&pages_metadata) {
 		pages_metadata.insert(slugify("tags"), tags_metadata);
