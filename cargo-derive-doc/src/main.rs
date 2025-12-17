@@ -145,8 +145,7 @@ fn find_source_file(args: &[OsString]) -> Option<PathBuf> {
 	// The source file is usually the last argument that ends with .rs
 	args.iter()
 		.filter_map(|arg| arg.to_str())
-		.filter(|arg| arg.ends_with(".rs") && !arg.starts_with("--"))
-		.next_back()
+		.rfind(|arg| arg.ends_with(".rs") && !arg.starts_with("--"))
 		.map(PathBuf::from)
 }
 
