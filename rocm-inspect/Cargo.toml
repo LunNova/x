@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2025 LunNova
+#
+# SPDX-License-Identifier: CC0-1.0
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "rocm-inspect"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[[bin]]
+name = "rocm-obj-ls"
+path = "obj-ls.rs"
+
+[dependencies]
+argh = "0.1.12"
+goblin = "0.8"
+flate2 = "1.0"
+zstd = "0.13"
+owo-colors = { version = "4", features = ["supports-colors"] }
+cpp_demangle = "0.5"

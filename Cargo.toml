@@ -9,6 +9,7 @@ members = [
 	"pattern-wishcast",
 	"pattern-wishcast/pattern-wishcast-macros",
 	"remarkable",
+	"rocm-inspect",
 	"site",
 	"scratch",
 ]
