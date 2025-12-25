@@ -18,7 +18,7 @@ path = "obj-ls.rs"
 
 [dependencies]
 argh = "0.1.12"
-goblin = "0.8"
+goblin = "0.10"
 flate2 = "1.0"
 zstd = "0.13"
 owo-colors = { version = "4", features = ["supports-colors"] }
