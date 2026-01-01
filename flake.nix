@@ -82,6 +82,7 @@
             pkgs.cargo-release
             pkgs.cargo-workspaces
             pkgs.cargo-machete
+            pkgs.libevdev
             pkgs.reuse
             pkgs.openssl.dev
             pkgs.openssl
