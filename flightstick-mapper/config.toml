@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2025 LunNova
+# SPDX-FileCopyrightText: 2026 LunNova
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# FlightStick-NURBS Configuration File
+# This file defines multiple devices and their axis mappings
+
+[[devices]]
+# Right Thrustmaster Solaris Base (PID 0422) - previously hardcoded
+name = "Right Thrustmaster Base"
+enabled = true
+
+[devices.device]
+vid = 1103  # 0x044f
+pid = 1058  # 0x0422
+version = 273  # 0x0111
+
+[devices.output_device]
+# Make right stick appear as VKB Gladiator NXT R
+name = "VKBsim Gladiator NXT R"
+# vendor_id = 0x231d
+product_id = 1057   # 0x0421
+# version = 1
+
+# [devices.output_device]
+# # Custom virtual device configuration (commented out as example)
+# name = "Flight Stick Right (NURBS)"
+# vendor_id = 0x1234    # Custom VID for easy identification
+# product_id = 0x5678   # Custom PID for easy identification
+# version = 0x0100      # Custom version
+# # If output_device is not specified, uses default: "Curved <original_name>" with original IDs + 0x8000
+
+[devices.axes]
+# X-axis configuration (typically roll/left-right stick movement)
+"ABS_X" = { curve = { type = "polynomial", power = 2.0, deadzone = 0.01 } }
+
+# Y-axis configuration (typically pitch/forward-back stick movement)
+"ABS_Y" = { curve = { type = "polynomial", power = 2.0, deadzone = 0.01 } }
+
+# RZ-axis configuration (typically twist/rudder)
+"ABS_RZ" = { curve = { type = "polynomial", power = 2.0, deadzone = 0.01 } }
+
+[[devices]]
+# Left Thrustmaster Solaris Base (PID 042a)
+name = "Left Thrustmaster Base"
+enabled = true
+
+[devices.device]
+vid = 1103  # 0x044f
+pid = 1066  # 0x042a
+version = 273  # 0x0111
+
+[devices.output_device]
+# Make left stick appear as TWCS Throttle
+name = "Thrustmaster TWCS Throttle"
+product_id = 1065
+# vendor_id = 0x044f
+# product_id = 0xb687
+# version = 1
+
+[devices.axes]
+# Different curve configuration for left variant - less aggressive
+"ABS_X" = { curve = { type = "polynomial", power = 1.5, deadzone = 0.02 } }
+"ABS_Y" = { curve = { type = "polynomial", power = 1.5, deadzone = 0.02 } }
+"ABS_RZ" = { curve = { type = "polynomial", power = 1.5, deadzone = 0.02 } }
