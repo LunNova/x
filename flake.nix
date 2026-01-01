@@ -30,7 +30,6 @@
           inherit system overlays;
         };
         rust-bin = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-        rustfmt = pkgs.lib.getExe' rust-bin "rustfmt";
       in
       {
         checks = {
