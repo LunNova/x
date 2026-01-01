@@ -112,7 +112,7 @@ impl Ord for PageSortKey {
 
 impl PartialOrd for PageSortKey {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
+		Some(std::cmp::Ord::cmp(self, other))
 	}
 }
 
