@@ -10,6 +10,8 @@ mod front_matter;
 mod pages;
 mod render;
 mod semantic_web;
+#[cfg(test)]
+mod transparent_dirs_tests;
 mod url_rewriter;
 mod utils;
 

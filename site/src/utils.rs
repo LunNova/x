@@ -34,6 +34,11 @@ pub fn slugify(s: &str) -> String {
 	}
 
 	let mut result = input
+		.split('/')
+		// Transparent directories: segments starting with _ are stripped from URL
+		.filter(|segment| !segment.starts_with('_'))
+		.collect::<Vec<_>>()
+		.join("/")
 		.to_lowercase()
 		.replace([' ', '_'], "-")
 		.chars()
@@ -148,6 +153,22 @@ mod tests {
 		assert_eq!(slugify("articles/"), "articles/");
 		assert_eq!(slugify("articles/_index"), "articles/");
 		assert_eq!(slugify("articles/tech"), "articles/tech/");
+	}
+
+	#[test]
+	fn test_slugify_transparent_dirs() {
+		assert_eq!(slugify("articles/_2024/my-post"), "articles/my-post/");
+		assert_eq!(slugify("articles/_2024/_drafts/my-post"), "articles/my-post/");
+		assert_eq!(slugify("articles/_old/nested/page"), "articles/nested/page/");
+		assert_eq!(slugify("_hidden/articles/_2024/post"), "articles/post/");
+		assert_eq!(slugify("_archive/old-post"), "old-post/");
+
+		// _index is stripped as filename, not filtered as transparent dir
+		assert_eq!(slugify("articles/_index"), "articles/");
+		assert_eq!(slugify("articles/_2024/_index"), "articles/");
+
+		// underscore in filename (not directory) converts to hyphen
+		assert_eq!(slugify("articles/my_post"), "articles/my-post/");
 	}
 
 	#[test]
