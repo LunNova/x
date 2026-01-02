@@ -20,4 +20,4 @@ argh = "0.1"
 similar = "2.7"
 
 [dev-dependencies]
-error_set = "0.8.5"
+error_set = "0.9"
