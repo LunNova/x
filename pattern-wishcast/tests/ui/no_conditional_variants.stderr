@@ -1,7 +1,7 @@
 error: No conditional variants found for enum `Value`. All variants are included in all pattern types, making them identical. Either: 1) Add variants that are excluded from some pattern types, 2) Use a single type alias instead of multiple identical ones, or 3) Remove `is <P: PatternFields>` if you don't need strictness patterns.
   --> tests/ui/no_conditional_variants.rs:9:1
    |
-9  | / pattern_wishcast! {
+ 9 | / pattern_wishcast! {
 10 | |     enum Value is <P: PatternFields> = {
 11 | |         HostValue { value: String },
 12 | |         TupleValue { elements: Vec<Self> },

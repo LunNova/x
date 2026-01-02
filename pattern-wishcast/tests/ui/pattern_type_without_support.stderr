@@ -1,7 +1,7 @@
 error: Cannot create pattern type for enum `"Value"`. You must declare the enum with pattern support: `enum "Value" is <P: PatternTrait> { ... }`
   --> tests/ui/pattern_type_without_support.rs:9:1
    |
-9  | / pattern_wishcast! {
+ 9 | / pattern_wishcast! {
 10 | |     // This enum doesn't declare pattern support
 11 | |     enum Value = {
 12 | |         HostValue { value: String },

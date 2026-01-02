@@ -1,7 +1,7 @@
 error: Enum `Value` has only one pattern type `MyValue`. Since there are no conditional variants, you don't need pattern support. Remove `is <P: PatternFields>` from the enum declaration and use a simple type alias instead: `type MyValue = Value;`
   --> tests/ui/single_pattern_type_no_conditional.rs:9:1
    |
-9  | / pattern_wishcast! {
+ 9 | / pattern_wishcast! {
 10 | |     enum Value is <P: PatternFields> = {
 11 | |         HostValue { value: String },
 12 | |         TupleValue { elements: Vec<Self> },

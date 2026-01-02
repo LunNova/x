@@ -1,9 +1,9 @@
-error[E0599]: no method named `to_partial_mut` found for enum `Value` in the current scope
+error[E0599]: no method named `to_partial_mut` found for enum `Value<P>` in the current scope
   --> tests/ui/upcast_mut_unsound.rs:37:48
    |
-7  | / pattern_wishcast! {
-8  | |     // Define a base value enum that can be None or Some
-9  | |     enum Value is <P: PatternFields> = {
+ 7 | / pattern_wishcast! {
+ 8 | |     // Define a base value enum that can be None or Some
+ 9 | |     enum Value is <P: PatternFields> = {
 10 | |         None,
 ...  |
 22 | |     impl CompleteValue : PartialValue;
@@ -33,4 +33,4 @@ warning: unreachable statement
 55 |       unreachable!("Should not be possible to reach this");
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
    |
-   = note: `#[warn(unreachable_code)]` on by default
+   = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
