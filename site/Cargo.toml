@@ -22,15 +22,15 @@ hyper-util = "0.1.7"
 mime_guess = "2.0.5"
 notify = "8.0"
 num_cpus = "1.16.0"
-opentelemetry = "0.30.0"
-opentelemetry-otlp = { version = "0.30.0", features = ["http-proto", "reqwest-client"] }
-opentelemetry_sdk = { version = "0.30.0", features = ["rt-tokio"] }
+opentelemetry = "0.31.0"
+opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "reqwest-client"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
 pulldown-cmark = "0.13.0"
 syntect = "5.2"
-two-face = { version = "0.4", features = ["syntect-default-onig"] }
+two-face = { version = "0.5", features = ["syntect-default-onig"] }
 pulldown-cmark-escape = "0.11"
 itertools = "0.14"
-html5ever = "0.35"
+html5ever = "0.36"
 url = "2.5"
 rand = "0.9.0"
 regex = "1.10.6"
@@ -41,12 +41,12 @@ smallvec = "1.13.2"
 tera = "1.20.0"
 tokio = { version = "1.40.0", features = ["full"] }
 tracing = "0.1.40"
-tracing-opentelemetry = "0.31.0"
+tracing-opentelemetry = "0.32.0"
 tracing-subscriber = "0.3.18"
 chrono = { version = "0.4.39", features = ["serde"] }
 argh = "0.1"
 toml = "0.9"
-markup5ever = "0.35"
+markup5ever = "0.36"
 
 [dev-dependencies]
 tempfile = "3.12.0"
