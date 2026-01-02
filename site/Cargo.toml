@@ -9,7 +9,7 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-autometrics = { version = "2.0.0", features = ["opentelemetry-0_24"] }
+autometrics = { version = "3", features = ["opentelemetry-0_30"] }
 blake3 = "1.5.4"
 fastcdc = "3.1.0"
 futures = "0.3.30"

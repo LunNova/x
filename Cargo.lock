@@ -116,15 +116,15 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "autometrics"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e23d87191207a9f451a6214e861a184cd6db30e910371e464839ecf385f09ce"
+checksum = "7f2820a6e97e2b832bcc1716b8f4ff924384a5b988c7c416e51aab3aab69870b"
 dependencies = [
  "autometrics-macros",
- "cfg_aliases 0.1.1",
+ "cfg_aliases",
  "linkme",
  "once_cell",
- "opentelemetry 0.24.0",
+ "opentelemetry",
  "prometheus",
  "spez",
  "thiserror 1.0.69",
@@ -132,9 +132,9 @@ dependencies = [
 
 [[package]]
 name = "autometrics-macros"
-version = "2.0.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc9eeb66696a988c64d8bbb73a6c83d5df20fe2bf7222aaf12ba8cd51a9ebf45"
+checksum = "fff2c2bc18d2b891fdd08a6b390f6cc2da5e49eab18be8f76ae8e16a8802a35b"
 dependencies = [
  "percent-encoding",
  "proc-macro2",
@@ -265,12 +265,6 @@ name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
-
-[[package]]
-name = "cfg_aliases"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
 name = "cfg_aliases"
@@ -1521,7 +1515,7 @@ checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
 dependencies = [
  "bitflags 2.10.0",
  "cfg-if",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "memoffset",
 ]
@@ -1644,19 +1638,6 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c365a63eec4f55b7efeceb724f1336f26a9cf3427b70e59e2cd2a5b947fba96"
-dependencies = [
- "futures-core",
- "futures-sink",
- "js-sys",
- "once_cell",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "opentelemetry"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaf416e4cb72756655126f7dd7bb0af49c674f4c1b9903e80c009e0c37e552e6"
@@ -1678,7 +1659,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "http",
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "reqwest",
 ]
 
@@ -1689,7 +1670,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dbee664a43e07615731afc539ca60c6d9f1a9425e25ca09c57bc36c87c55852b"
 dependencies = [
  "http",
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "opentelemetry-http",
  "opentelemetry-proto",
  "opentelemetry_sdk",
@@ -1705,7 +1686,7 @@ version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e046fd7660710fe5a05e8748e70d9058dc15c94ba914e7c4faa7c728f0e8ddc"
 dependencies = [
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "opentelemetry_sdk",
  "prost",
  "tonic",
@@ -1720,7 +1701,7 @@ dependencies = [
  "futures-channel",
  "futures-executor",
  "futures-util",
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "percent-encoding",
  "rand 0.9.2",
  "serde_json",
@@ -1999,16 +1980,16 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.13.4"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
+checksum = "3ca5326d8d0b950a9acd87e6a3f94745394f62e4dae1b1ee22b2bc0c394af43a"
 dependencies = [
  "cfg-if",
  "fnv",
  "lazy_static",
  "memchr",
  "parking_lot 0.12.5",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -2494,7 +2475,7 @@ dependencies = [
  "mime_guess",
  "notify",
  "num_cpus",
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
  "pulldown-cmark",
@@ -3107,7 +3088,7 @@ checksum = "ddcf5959f39507d0d04d6413119c04f33b623f4f951ebcbdddddfad2d0623a9c"
 dependencies = [
  "js-sys",
  "once_cell",
- "opentelemetry 0.30.0",
+ "opentelemetry",
  "opentelemetry_sdk",
  "smallvec",
  "tracing",
