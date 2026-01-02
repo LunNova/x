@@ -1,5 +1,3 @@
-cargo-features = ["different-binary-name"]
-
 [package]
 name = "nyoomy-build-nix"
 version = "0.1.0"
@@ -9,7 +7,6 @@ edition.workspace = true
 [[bin]]
 name = "nyoomy-build-nix"
 path = "main.rs"
-filename = "nyoomy-build.nix"
 
 [dependencies]
 argh = "0.1.12"
