@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2025 LunNova
-// SPDX-FileCopyrightText: 2026 LunNova
 //
 // SPDX-License-Identifier: MIT
 
