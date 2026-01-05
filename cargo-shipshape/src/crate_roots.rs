@@ -5,34 +5,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// Check if a source file can have sibling modules.
-/// Returns (`can_have_siblings`, `optional_warning`).
-#[must_use]
-pub fn can_have_sibling_modules(source_path: &Path) -> (bool, Option<String>) {
-	let file_name = source_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-	if file_name == "mod.rs" {
-		return (true, None);
-	}
-
-	let is_root_name = file_name == "lib.rs" || file_name == "main.rs";
-	let fallback = |msg: &str| {
-		if is_root_name {
-			(true, Some(msg.to_string()))
-		} else {
-			(false, None)
-		}
-	};
-
-	let Some(cargo_toml) = find_cargo_toml(source_path) else {
-		return fallback("No Cargo.toml found, using filename heuristics for module placement");
-	};
-	let Ok(crate_roots) = parse_crate_roots(&cargo_toml) else {
-		return fallback("Failed to parse Cargo.toml, using filename heuristics for module placement");
-	};
-
-	(source_path.canonicalize().is_ok_and(|abs| crate_roots.contains(&abs)), None)
-}
-
 /// Collect roots from a Cargo.toml array section and its default directory.
 fn collect_target_roots(roots: &mut HashSet<PathBuf>, manifest: &toml::Value, cargo_dir: &Path, section: &str, default_dir: &str) {
 	if let Some(items) = manifest.get(section).and_then(|v| v.as_array()) {
@@ -128,21 +100,4 @@ pub fn parse_crate_roots(cargo_toml: &Path) -> anyhow::Result<HashSet<PathBuf>> 
 	}
 
 	Ok(roots)
-}
-
-/// Check if extracted modules should use the mod.rs form (subdir/mod.rs).
-/// This is true for tests/, examples/, benches/ to avoid Cargo auto-discovery creating new binaries.
-pub fn use_mod_rs_form(source_path: &Path) -> bool {
-	let Some(cargo_toml) = find_cargo_toml(source_path) else {
-		return false;
-	};
-	let cargo_dir = cargo_toml.parent().expect("Cargo.toml has parent");
-	// find_cargo_toml already canonicalized source_path, so parent exists
-	let source_parent = source_path
-		.parent()
-		.and_then(|p| p.canonicalize().ok())
-		.expect("source parent canonicalizable after find_cargo_toml");
-	["tests", "examples", "benches"]
-		.iter()
-		.any(|subdir| cargo_dir.join(subdir).canonicalize().ok().as_ref() == Some(&source_parent))
 }

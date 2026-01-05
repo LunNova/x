@@ -584,3 +584,58 @@ path = "lib.rs"
 	let extracted = fs::read_to_string(&good_tests_rs).unwrap();
 	assert!(extracted.contains("use super::*"), "Extracted module should preserve use super::*");
 }
+
+#[test]
+fn test_extraction_skips_when_output_lands_in_cargo_special_dir() {
+	// Setup: lib.rs + tests.rs (module) + tests/integration.rs (integration test)
+	// tests.rs has a large inline mod that would extract to tests/helpers.rs
+	// But tests/ is Cargo's integration test directory - extraction must be skipped
+	let tempdir = tempfile::tempdir().expect("Failed to create temp dir");
+	let tests_dir = tempdir.path().join("tests");
+	fs::create_dir_all(&tests_dir).unwrap();
+
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[package]
+name = "testcrate"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+"#,
+	)
+	.unwrap();
+
+	// lib.rs references tests module
+	fs::write(tempdir.path().join("lib.rs"), "#[cfg(test)]\nmod tests;\n").unwrap();
+
+	// Existing integration test in tests/
+	fs::write(tests_dir.join("integration.rs"), "#[test]\nfn integration_test() {}\n").unwrap();
+
+	// tests.rs (unit test module) with large inline mod
+	let tests_module_content = format!(
+		"use super::*;\n\nmod helpers {{\n{}\n}}\n\n#[test]\nfn unit_test() {{}}\n",
+		large_module_body(30)
+	);
+	fs::write(tempdir.path().join("tests.rs"), &tests_module_content).unwrap();
+
+	let result = run_sort_items(&["--extract-threshold", "5", tempdir.path().join("tests.rs").to_str().unwrap()]);
+
+	assert!(result.success(), "Should succeed (with warning)");
+
+	// The module should NOT be extracted - output would be tests/helpers.rs
+	// which Cargo treats as an integration test
+	let bad_path = tests_dir.join("helpers.rs");
+	assert!(
+		!bad_path.exists(),
+		"Should NOT create tests/helpers.rs - Cargo treats files in tests/ as integration tests"
+	);
+
+	// Module should remain inline
+	let tests_after = fs::read_to_string(tempdir.path().join("tests.rs")).unwrap();
+	assert!(
+		tests_after.contains("mod helpers {"),
+		"mod helpers should remain inline when extraction would land in Cargo special dir"
+	);
+}

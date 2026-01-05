@@ -8,6 +8,12 @@ use ra_ap_syntax::ast::{HasModuleItem, HasName};
 use ra_ap_syntax::{AstNode, Edition, SourceFile, ast};
 use std::path::{Path, PathBuf};
 
+/// Cargo context for a source file - avoids repeated Cargo.toml lookups.
+struct CargoContext {
+	cargo_dir: Option<PathBuf>,
+	crate_roots: Option<std::collections::HashSet<PathBuf>>,
+}
+
 /// Result of extracting large inline modules from a source file.
 pub struct ExtractionResult {
 	/// The modified source with large inline modules replaced by declarations
@@ -54,10 +60,10 @@ fn dedent(s: &str) -> String {
 
 /// Determine the file path for an extracted module using Cargo-aware logic.
 /// Returns (path, `optional_warning`).
-fn determine_module_path(source_path: &Path, mod_name: &str) -> (PathBuf, Option<String>) {
+fn determine_module_path(source_path: &Path, mod_name: &str, ctx: &CargoContext) -> (PathBuf, Option<String>) {
 	let source_dir = source_path.parent().unwrap_or(Path::new("."));
-	let (can_sibling, warning) = crate_roots::can_have_sibling_modules(source_path);
-	let force_mod_rs = crate_roots::use_mod_rs_form(source_path);
+	let (can_sibling, warning) = ctx.can_have_sibling_modules(source_path);
+	let force_mod_rs = ctx.use_mod_rs_form(source_path);
 
 	let base_path = if can_sibling {
 		if force_mod_rs {
@@ -107,6 +113,7 @@ pub fn extract_large_modules(source: &str, source_path: &Path, threshold: usize)
 		);
 	}
 
+	let ctx = CargoContext::new(source_path);
 	let mut warnings = Vec::new();
 
 	let mut extractions: Vec<ModuleExtraction> = Vec::new();
@@ -120,11 +127,23 @@ pub fn extract_large_modules(source: &str, source_path: &Path, threshold: usize)
 				if line_count > threshold {
 					let mod_name = m.name().expect("module with item_list has name").to_string();
 
-					let (output_path, warning) = determine_module_path(source_path, &mod_name);
+					let (output_path, warning) = determine_module_path(source_path, &mod_name, &ctx);
 					if let Some(w) = warning {
 						if !warnings.contains(&w) {
 							warnings.push(w);
 						}
+					}
+
+					// Skip extraction if output would land in Cargo special directory
+					if ctx.is_in_special_dir(&output_path) {
+						let w = format!(
+							"Skipping extraction of `mod {mod_name}`: output path {} is in a Cargo special directory (tests/examples/benches)",
+							output_path.display()
+						);
+						if !warnings.contains(&w) {
+							warnings.push(w);
+						}
+						continue;
 					}
 
 					let inner = body_text
@@ -173,4 +192,78 @@ pub fn extract_large_modules(source: &str, source_path: &Path, threshold: usize)
 		extracted_files,
 		warnings,
 	})
+}
+
+impl CargoContext {
+	fn new(source_path: &Path) -> Self {
+		let cargo_toml = crate_roots::find_cargo_toml(source_path);
+		let (cargo_dir, crate_roots) = match cargo_toml {
+			Some(ref toml) => {
+				let dir = toml.parent().map(Path::to_path_buf);
+				let roots = crate_roots::parse_crate_roots(toml).ok();
+				(dir, roots)
+			}
+			None => (None, None),
+		};
+		Self { cargo_dir, crate_roots }
+	}
+
+	fn can_have_sibling_modules(&self, source_path: &Path) -> (bool, Option<String>) {
+		let file_name = source_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+		if file_name == "mod.rs" {
+			return (true, None);
+		}
+
+		let is_root_name = file_name == "lib.rs" || file_name == "main.rs";
+		let fallback = |msg: &str| {
+			if is_root_name {
+				(true, Some(msg.to_string()))
+			} else {
+				(false, None)
+			}
+		};
+
+		let Some(ref roots) = self.crate_roots else {
+			return fallback("No Cargo.toml found, using filename heuristics for module placement");
+		};
+
+		(source_path.canonicalize().is_ok_and(|abs| roots.contains(&abs)), None)
+	}
+
+	fn use_mod_rs_form(&self, source_path: &Path) -> bool {
+		let Some(ref cargo_dir) = self.cargo_dir else {
+			return false;
+		};
+		// CargoContext::new already canonicalized source_path via find_cargo_toml
+		let source_parent = source_path
+			.parent()
+			.and_then(|p| p.canonicalize().ok())
+			.expect("source parent canonicalizable after find_cargo_toml");
+		["tests", "examples", "benches"]
+			.iter()
+			.any(|subdir| cargo_dir.join(subdir).canonicalize().ok().as_ref() == Some(&source_parent))
+	}
+
+	/// Check if a path is inside a Cargo special directory (tests/, examples/, benches/).
+	fn is_in_special_dir(&self, path: &Path) -> bool {
+		let Some(ref cargo_dir) = self.cargo_dir else {
+			return false;
+		};
+
+		// path is an extraction output like "tests/foo.rs" - always has a parent
+		let parent = path.parent().expect("extraction output path has parent");
+		let Ok(abs_parent) = parent.canonicalize() else {
+			return false;
+		};
+
+		for subdir in ["tests", "examples", "benches"] {
+			let Ok(special_dir) = cargo_dir.join(subdir).canonicalize() else {
+				continue;
+			};
+			if abs_parent.starts_with(&special_dir) || abs_parent == special_dir {
+				return true;
+			}
+		}
+		false
+	}
 }
