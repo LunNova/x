@@ -5,6 +5,7 @@
 apple!();
 
 include!("other.rs");
+
 zebra!();
 
 fn main() {}

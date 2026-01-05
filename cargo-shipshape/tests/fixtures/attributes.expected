@@ -11,5 +11,6 @@ struct Zebra;
 
 #[cfg(test)]
 fn apple_fn() {}
+
 #[inline]
 fn zebra_fn() {}

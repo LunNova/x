@@ -7,4 +7,5 @@ struct Apple(String);
 struct Banana {
     field: i32,
 }
+
 struct Zebra(i32, i32);

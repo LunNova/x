@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 struct Bar;
-struct Foo;
-
 impl Bar {}
 
 impl Debug for Bar {}
 
 impl Display for Bar {}
+
+struct Foo;
 
 impl Foo {}
 

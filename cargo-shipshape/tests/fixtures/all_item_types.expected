@@ -22,15 +22,15 @@ macro my_macro_2 {}
 
 trait MyTrait {}
 
+enum MyEnum { A, B }
+
 struct MyStruct;
 
-enum MyEnum { A, B }
+impl MyStruct {}
 
 union MyUnion { a: i32, b: u32 }
 
 fn my_function() {}
-
-impl MyStruct {}
 
 mod inline_mod {
     fn inner() {}

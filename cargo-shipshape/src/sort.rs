@@ -6,9 +6,16 @@ use anyhow::Result;
 use ra_ap_syntax::ast::HasModuleItem;
 use ra_ap_syntax::ast::HasName;
 use ra_ap_syntax::{AstNode, Edition, SourceFile, SyntaxNode, ast};
-use std::mem::discriminant;
 
 struct Item<'a>(ItemSort<'a>, &'a str);
+
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+enum TypeDefKind<'a> {
+	Struct,
+	Enum,
+	Union,
+	Impl(Option<&'a str>), // trait name for trait impls
+}
 
 #[derive(PartialEq, PartialOrd, Eq, Ord)]
 enum ItemSort<'a> {
@@ -21,11 +28,9 @@ enum ItemSort<'a> {
 	MacroRules(&'a str),
 	MacroCall(&'a str),
 	Trait(&'a str),
-	Struct(&'a str),
-	Enum(&'a str),
-	Union(&'a str),
+	// Sorts by type name first, keeping impls with their types
+	TypeDef(&'a str, TypeDefKind<'a>),
 	Fn(&'a str),
-	Impl(&'a str, Option<&'a str>),
 	BlockMod(&'a str),
 }
 
@@ -44,15 +49,15 @@ fn classify<'a>(source: &'a str, item: &ast::Item) -> Result<ItemSort<'a>> {
 		ast::Item::MacroRules(i) => MacroRules(name_of(source, i.name())),
 		ast::Item::MacroCall(i) => MacroCall(name_of(source, i.path())),
 		ast::Item::Trait(i) => Trait(name_of(source, i.name())),
-		ast::Item::Struct(i) => Struct(name_of(source, i.name())),
-		ast::Item::Enum(i) => Enum(name_of(source, i.name())),
-		ast::Item::Union(i) => Union(name_of(source, i.name())),
+		ast::Item::Struct(i) => TypeDef(name_of(source, i.name()), TypeDefKind::Struct),
+		ast::Item::Enum(i) => TypeDef(name_of(source, i.name()), TypeDefKind::Enum),
+		ast::Item::Union(i) => TypeDef(name_of(source, i.name()), TypeDefKind::Union),
 		ast::Item::Fn(i) => Fn(name_of(source, i.name())),
 		ast::Item::Impl(i) => {
 			let ty = i.self_ty().expect("impl always has self_ty");
 			let ty = node_text(source, ty.syntax());
 			let ty = ty.split('<').next().expect("split always has first element").trim();
-			Impl(ty, i.trait_().map(|t| node_text(source, t.syntax())))
+			TypeDef(ty, TypeDefKind::Impl(i.trait_().map(|t| node_text(source, t.syntax()))))
 		}
 		ast::Item::ExternBlock(_) => ExternCrate("extern"),
 		ast::Item::MacroDef(i) => MacroRules(name_of(source, i.name())),
@@ -113,19 +118,26 @@ pub fn sort_items(source: &str) -> Result<String> {
 	items.sort_by(|a, b| a.0.cmp(&b.0));
 
 	let mut result = leading.to_string();
-	let mut prev: Option<&ItemSort> = None;
+	let mut prev: Option<(&ItemSort, &str)> = None;
 
 	for Item(sort, text) in &items {
-		if let Some(p) = prev {
+		if let Some((p, prev_text)) = prev {
 			debug_assert!(
 				result.ends_with('\n'),
 				"result should always end with newline after processing an item"
 			);
-			if discriminant(p) != discriminant(sort) && !result.ends_with("\n\n") {
+			let both_single_line = !prev_text.trim().contains('\n') && !text.trim().contains('\n');
+			let needs_blank = match (p, sort) {
+				(ItemSort::Use, ItemSort::Use) => false,
+				(ItemSort::TypeDef(n1, _), ItemSort::TypeDef(n2, _)) if n1 == n2 && both_single_line => false,
+				(ItemSort::Fn(_), ItemSort::Fn(_)) if both_single_line => false,
+				_ => true,
+			};
+			if needs_blank && !result.ends_with("\n\n") {
 				result.push('\n');
 			}
 		}
-		prev = Some(sort);
+		prev = Some((sort, text));
 		result.push_str(text);
 		if !result.ends_with('\n') {
 			result.push('\n');
