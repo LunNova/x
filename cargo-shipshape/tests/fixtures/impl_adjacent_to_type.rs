@@ -1,0 +1,5 @@
+struct Foo { x: i32 }
+impl Foo { fn new() -> Self { todo!() } }
+
+struct Bar { y: i32 }
+impl Bar { fn new() -> Self { todo!() } }

@@ -78,12 +78,14 @@ mod fixture_tests {
 	fixture_test!(async_functions);
 	fixture_test!(attributes);
 	fixture_test!(basic_sorting);
+	fixture_test!(blank_line_preservation);
 	fixture_test!(cfg_modules);
 	fixture_test!(complex_impl);
 	fixture_test!(const_generics);
 	fixture_test!(doc_comments);
 	fixture_test!(extern_block);
 	fixture_test!(generics);
+	fixture_test!(impl_adjacent_to_type);
 	fixture_test!(impl_grouping);
 	fixture_test!(inner_attributes);
 	fixture_test!(license_header);

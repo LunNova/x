@@ -1,0 +1,33 @@
+fn main() {
+    todo!()
+}
+
+#[test]
+fn test_let_pattern() {
+    todo!()
+}
+
+#[test]
+fn test_lambda_simple() {
+    todo!()
+}
+
+#[test]
+fn test_lambda_typed() {
+    todo!()
+}
+
+#[test]
+fn test_lambda_bounded() {
+    todo!()
+}
+
+#[test]
+fn test_forall_simple() {
+    todo!()
+}
+
+#[test]
+fn test_forall_bounded() {
+    todo!()
+}
