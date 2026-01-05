@@ -74,19 +74,11 @@ fn determine_module_path(source_path: &Path, mod_name: &str) -> (PathBuf, Option
 		source_dir.join(stem).join(format!("{mod_name}.rs"))
 	};
 
-	// If the target path already exists or there's a directory with that name,
-	// use the mod.rs form instead
-	let final_path = if base_path.extension().is_some_and(|ext| ext == "rs") && !base_path.ends_with("mod.rs") {
-		let simple_path = &base_path;
-		let mod_name_from_path = simple_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-		let parent = simple_path.parent().unwrap_or(Path::new("."));
-		let dir_path = parent.join(mod_name_from_path).join("mod.rs");
-
-		if simple_path.exists() || parent.join(mod_name_from_path).is_dir() {
-			dir_path
-		} else {
-			base_path
-		}
+	// If the target file already exists, use mod.rs form to avoid overwriting
+	let final_path = if base_path.extension().is_some_and(|ext| ext == "rs") && !base_path.ends_with("mod.rs") && base_path.exists() {
+		let mod_name_from_path = base_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+		let parent = base_path.parent().unwrap_or(Path::new("."));
+		parent.join(mod_name_from_path).join("mod.rs")
 	} else {
 		base_path
 	};

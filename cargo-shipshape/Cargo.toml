@@ -5,7 +5,7 @@
 [package]
 name = "cargo-shipshape"
 description = "Cargo subcommand to sort Rust file items by type and name"
-version = "0.0.1-pre.1"
+version = "0.0.1-pre.2"
 edition.workspace = true
 rust-version.workspace = true
 license = "MIT"

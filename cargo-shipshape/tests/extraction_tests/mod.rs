@@ -526,3 +526,61 @@ path = "custom_tests/foo.rs"
 		"[[test]] with explicit path should be recognized as crate root"
 	);
 }
+
+#[test]
+fn test_extraction_not_blocked_by_existing_directory() {
+	// Bug: [lib] path = "lib.rs" (no src/), existing tests/ dir for integration tests
+	// Extracting `mod tests` from lib.rs should create tests.rs (sibling), NOT tests/mod.rs
+	// The existence of tests/ directory should not force mod.rs form
+	let tempdir = tempfile::tempdir().expect("Failed to create temp dir");
+	let tests_dir = tempdir.path().join("tests");
+	fs::create_dir_all(&tests_dir).unwrap();
+
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[package]
+name = "test"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+"#,
+	)
+	.unwrap();
+
+	// Existing integration test in tests/
+	fs::write(tests_dir.join("integration.rs"), "#[test]\nfn it_works() {}\n").unwrap();
+
+	// lib.rs with inline unit tests using super::*
+	let lib_content = format!(
+		"pub fn some_fn() {{}}\n\n#[cfg(test)]\nmod tests {{\n    use super::*;\n{}\n}}\n",
+		(0..20)
+			.map(|i| format!("    #[test]\n    fn test_{i}() {{ some_fn(); }}"))
+			.collect::<Vec<_>>()
+			.join("\n")
+	);
+	fs::write(tempdir.path().join("lib.rs"), &lib_content).unwrap();
+
+	let result = run_sort_items(&["--extract-threshold", "5", tempdir.path().join("lib.rs").to_str().unwrap()]);
+
+	assert!(result.success(), "Extraction should succeed");
+
+	// tests.rs as sibling is correct - it's just a module, not an integration test
+	let good_tests_rs = tempdir.path().join("tests.rs");
+	// tests/mod.rs is wrong - Cargo treats files in tests/ as integration tests
+	let bad_tests_mod = tests_dir.join("mod.rs");
+
+	assert!(
+		!bad_tests_mod.exists(),
+		"Should NOT create tests/mod.rs - files in tests/ are integration tests"
+	);
+	assert!(
+		good_tests_rs.exists(),
+		"Should create tests.rs as sibling - directory existence doesn't conflict"
+	);
+
+	// Verify the extracted content has use super::*
+	let extracted = fs::read_to_string(&good_tests_rs).unwrap();
+	assert!(extracted.contains("use super::*"), "Extracted module should preserve use super::*");
+}
