@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+struct Bar;
+struct Foo;
+
+impl Bar {}
+
+impl Debug for Bar {}
+
+impl Display for Bar {}
+
+impl Foo {}
+
+impl Clone for Foo {}
+
+impl Debug for Foo {}

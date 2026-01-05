@@ -1,0 +1,15 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct Apple;
+
+#[derive(Debug)]
+struct Zebra;
+
+#[cfg(test)]
+fn apple_fn() {}
+#[inline]
+fn zebra_fn() {}

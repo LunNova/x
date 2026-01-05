@@ -1,0 +1,10 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+struct Apple(String);
+
+struct Banana {
+    field: i32,
+}
+struct Zebra(i32, i32);

@@ -1,0 +1,14 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+mod another_external;
+mod external_mod;
+
+struct Foo;
+
+fn main() {}
+
+mod inline_mod {
+    fn foo() {}
+}

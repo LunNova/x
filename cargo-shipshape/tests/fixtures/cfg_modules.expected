@@ -1,0 +1,13 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+mod core;
+
+#[cfg(feature = "extra")]
+mod extra;
+
+#[cfg(test)]
+mod tests;
+
+fn main() {}

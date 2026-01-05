@@ -1,0 +1,21 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+trait MyTrait {}
+
+struct Container<T>(T);
+
+impl<T> Container<T>
+where
+    T: Default,
+{
+    fn new() -> Self { todo!() }
+}
+
+impl<T> MyTrait for Container<T>
+where
+    T: Clone + Send,
+{
+    fn method(&self) {}
+}

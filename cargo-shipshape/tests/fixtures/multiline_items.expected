@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+struct Config {
+    name: String,
+    value: i32,
+    enabled: bool,
+}
+
+fn apple(x: i32) -> i32 {
+    x * 2
+}
+
+fn zebra(
+    a: i32,
+    b: i32,
+) -> i32 {
+    a + b
+}

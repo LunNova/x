@@ -1,0 +1,9 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+use std::io;
+
+fn apple() {}
+
+fn zebra() {}

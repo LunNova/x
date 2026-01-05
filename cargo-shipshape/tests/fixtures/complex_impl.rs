@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+impl<'a, T: Clone + Send> Iterator for MyIter<'a, T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> { None }
+}
+
+impl<T> MyIter<'_, T> {
+    fn new() -> Self { todo!() }
+}
+
+impl<T> Default for MyIter<'static, T> {
+    fn default() -> Self { todo!() }
+}
+
+struct MyIter<'a, T>(&'a T);

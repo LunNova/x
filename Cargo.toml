@@ -5,6 +5,7 @@
 [workspace]
 members = [
 	"cargo-derive-doc",
+	"cargo-shipshape",
 	"flightstick-mapper",
 	"nyoomy-build-nix",
 	"pattern-wishcast",

@@ -1,0 +1,37 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+extern crate std;
+
+mod external_mod;
+
+use std::collections::HashMap;
+
+const MY_CONST: i32 = 1;
+
+static MY_STATIC: i32 = 2;
+
+type MyAlias = i32;
+
+macro_rules! my_macro {
+    () => {};
+}
+
+macro my_macro_2 {}
+
+trait MyTrait {}
+
+struct MyStruct;
+
+enum MyEnum { A, B }
+
+union MyUnion { a: i32, b: u32 }
+
+fn my_function() {}
+
+impl MyStruct {}
+
+mod inline_mod {
+    fn inner() {}
+}

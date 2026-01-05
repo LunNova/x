@@ -70,11 +70,17 @@
             };
           };
         };
+        packages.cargo-shipshape = pkgs.callPackage ./cargo-shipshape { };
+
         devShells.default = pkgs.mkShell {
           inherit (self.checks.${pkgs.system}.pre-commit-check) shellHook;
 
+          LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+          inherit (pkgs.cargo-llvm-cov) LLVM_COV LLVM_PROFDATA;
           buildInputs = [
             pkgs.pkg-config
+            pkgs.clang
+            pkgs.cargo-llvm-cov
             pkgs.cargo-modules
             pkgs.cargo-flamegraph
             pkgs.cargo-nextest

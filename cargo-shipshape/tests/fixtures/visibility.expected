@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+pub(crate) fn crate_banana() {}
+
+fn private_zebra() {}
+
+pub fn public_apple() {}
+
+pub(super) fn super_cherry() {}

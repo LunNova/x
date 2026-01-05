@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+struct Vec<T>(T);
+
+impl Vec<i32> {}
+
+impl<T> Clone for Vec<T> {}
+
+impl<T: Debug> Debug for Vec<T> {}

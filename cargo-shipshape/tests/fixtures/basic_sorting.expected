@@ -1,0 +1,13 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+use std::io;
+
+const FOO: i32 = 1;
+
+struct Banana;
+
+fn apple() {}
+
+fn zebra() {}

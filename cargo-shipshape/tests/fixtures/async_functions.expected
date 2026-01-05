@@ -1,0 +1,8 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+async fn apple() {}
+
+fn sync_fn() {}
+async fn zebra() {}

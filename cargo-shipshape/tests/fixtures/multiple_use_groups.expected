@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 LunNova
+//
+// SPDX-License-Identifier: MIT
+
+use std::io;
+
+use std::fs;
+
+struct End;
+
+fn middle() {}
