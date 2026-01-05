@@ -134,10 +134,10 @@ pub fn extract_large_modules(source: &str, source_path: &Path, threshold: usize)
 						}
 					}
 
-					// Skip extraction if output would land in Cargo special directory
-					if ctx.is_in_special_dir(&output_path) {
+					// Skip extraction if output would cross into Cargo special directory
+					if ctx.crosses_into_special_dir(source_path, &output_path) {
 						let w = format!(
-							"Skipping extraction of `mod {mod_name}`: output path {} is in a Cargo special directory (tests/examples/benches)",
+							"Skipping extraction of `mod {mod_name}`: would create {} in Cargo special directory",
 							output_path.display()
 						);
 						if !warnings.contains(&w) {
@@ -227,43 +227,34 @@ impl CargoContext {
 			return fallback("No Cargo.toml found, using filename heuristics for module placement");
 		};
 
-		(source_path.canonicalize().is_ok_and(|abs| roots.contains(&abs)), None)
+		(roots.contains(source_path), None)
 	}
 
 	fn use_mod_rs_form(&self, source_path: &Path) -> bool {
-		let Some(ref cargo_dir) = self.cargo_dir else {
-			return false;
-		};
-		// CargoContext::new already canonicalized source_path via find_cargo_toml
-		let source_parent = source_path
-			.parent()
-			.and_then(|p| p.canonicalize().ok())
-			.expect("source parent canonicalizable after find_cargo_toml");
+		let Some(ref cargo_dir) = self.cargo_dir else { return false };
+		let source_parent = source_path.parent().expect("source path has parent");
 		["tests", "examples", "benches"]
 			.iter()
-			.any(|subdir| cargo_dir.join(subdir).canonicalize().ok().as_ref() == Some(&source_parent))
+			.any(|subdir| cargo_dir.join(subdir) == source_parent)
 	}
 
-	/// Check if a path is inside a Cargo special directory (tests/, examples/, benches/).
-	fn is_in_special_dir(&self, path: &Path) -> bool {
-		let Some(ref cargo_dir) = self.cargo_dir else {
-			return false;
-		};
+	/// Check if extraction would create a file in a Cargo special directory from outside it.
+	/// Extracting from tests/foo.rs to tests/bar/mod.rs is fine (both in tests/).
+	/// Extracting from src/lib.rs to tests/foo.rs is not (crosses into tests/).
+	fn crosses_into_special_dir(&self, source_path: &Path, output_path: &Path) -> bool {
+		let Some(ref cargo_dir) = self.cargo_dir else { return false };
+		let source_parent = source_path.parent().expect("source path has parent");
+		let output_parent = output_path.parent().expect("output path has parent");
 
-		// path is an extraction output like "tests/foo.rs" - always has a parent
-		let parent = path.parent().expect("extraction output path has parent");
-		let Ok(abs_parent) = parent.canonicalize() else {
-			return false;
-		};
-
-		for subdir in ["tests", "examples", "benches"] {
-			let Ok(special_dir) = cargo_dir.join(subdir).canonicalize() else {
-				continue;
-			};
-			if abs_parent.starts_with(&special_dir) || abs_parent == special_dir {
-				return true;
+		["tests", "examples", "benches"].iter().any(|subdir| {
+			let special_dir = cargo_dir.join(subdir);
+			if !special_dir.is_dir() {
+				return false;
 			}
-		}
-		false
+			let source_in = source_parent.starts_with(&special_dir) || source_parent == special_dir;
+			let output_in = output_parent.starts_with(&special_dir) || output_parent == special_dir;
+			// Problem: output lands in special dir but source isn't in it
+			output_in && !source_in
+		})
 	}
 }

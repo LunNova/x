@@ -26,9 +26,9 @@ fn collect_target_roots(roots: &mut HashSet<PathBuf>, manifest: &toml::Value, ca
 
 /// Find the nearest Cargo.toml by walking up from the source file's directory.
 /// Stops if a directory has no .rs files (we've left the Rust project).
+/// Expects source_path to already be canonical.
 #[must_use]
 pub fn find_cargo_toml(source_path: &Path) -> Option<PathBuf> {
-	let source_path = source_path.canonicalize().ok()?;
 	let mut current = source_path.parent()?;
 
 	loop {
@@ -54,8 +54,8 @@ pub fn find_cargo_toml(source_path: &Path) -> Option<PathBuf> {
 }
 
 fn insert_if_exists(roots: &mut HashSet<PathBuf>, path: &Path) {
-	if let Ok(abs_path) = path.canonicalize() {
-		roots.insert(abs_path);
+	if path.exists() {
+		roots.insert(path.to_path_buf());
 	}
 }
 
@@ -71,9 +71,7 @@ pub fn parse_crate_roots(cargo_toml: &Path) -> anyhow::Result<HashSet<PathBuf>> 
 	// lib: single target with default src/lib.rs
 	if let Some(lib) = manifest.get("lib") {
 		if let Some(path) = lib.get("path").and_then(|v| v.as_str()) {
-			if let Ok(abs_path) = cargo_dir.join(path).canonicalize() {
-				roots.insert(abs_path);
-			}
+			insert_if_exists(&mut roots, &cargo_dir.join(path));
 		} else {
 			insert_if_exists(&mut roots, &cargo_dir.join("src").join("lib.rs"));
 		}

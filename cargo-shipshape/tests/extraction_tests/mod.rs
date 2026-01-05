@@ -586,6 +586,47 @@ path = "lib.rs"
 }
 
 #[test]
+fn test_extraction_within_special_dir_with_existing_subdir() {
+	// Regression test: extraction within tests/ should work even when target subdir exists.
+	// Previously broken because canonicalize() failed on non-existent dirs, masking the bug.
+	let tempdir = tempfile::tempdir().expect("Failed to create temp dir");
+	let tests_dir = tempdir.path().join("tests");
+	let helper_dir = tests_dir.join("helper");
+	fs::create_dir_all(&helper_dir).unwrap();
+	fs::create_dir_all(tempdir.path().join("src")).unwrap();
+
+	fs::write(
+		tempdir.path().join("Cargo.toml"),
+		r#"[package]
+name = "testcrate"
+version = "0.1.0"
+edition = "2021"
+"#,
+	)
+	.unwrap();
+
+	fs::write(tempdir.path().join("src").join("lib.rs"), "").unwrap();
+
+	// Pre-existing file in helper/ subdir
+	fs::write(helper_dir.join("utils.rs"), "pub fn util() {}\n").unwrap();
+
+	// Integration test with large inline module
+	let test_content = format!("mod helper {{\n{}\n}}\n\n#[test]\nfn it_works() {{}}\n", large_module_body(20));
+	fs::write(tests_dir.join("integration.rs"), &test_content).unwrap();
+
+	let result = run_sort_items(&["--extract-threshold", "5", tests_dir.join("integration.rs").to_str().unwrap()]);
+
+	assert!(result.success(), "Extraction within tests/ should succeed");
+
+	// Should extract to tests/helper/mod.rs (subdir already exists)
+	let extracted = tests_dir.join("helper").join("mod.rs");
+	assert!(
+		extracted.exists(),
+		"Should create tests/helper/mod.rs even when helper/ already exists"
+	);
+}
+
+#[test]
 fn test_extraction_skips_when_output_lands_in_cargo_special_dir() {
 	// Setup: lib.rs + tests.rs (module) + tests/integration.rs (integration test)
 	// tests.rs has a large inline mod that would extract to tests/helpers.rs

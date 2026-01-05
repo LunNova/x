@@ -45,12 +45,15 @@ pub struct Args {
 }
 
 fn process_file(path: &std::path::Path, args: &Args) -> Result<bool> {
-	let source = std::fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+	let path = path
+		.canonicalize()
+		.with_context(|| format!("Failed to canonicalize {}", path.display()))?;
+	let source = std::fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
 
 	let (working_source, extracted_files): (Cow<'_, str>, Vec<_>) = if args.no_extract {
 		(Cow::Borrowed(&source), vec![])
 	} else {
-		let result = extract::extract_large_modules(&source, path, args.extract_threshold)?;
+		let result = extract::extract_large_modules(&source, &path, args.extract_threshold)?;
 		for warning in &result.warnings {
 			eprintln!("Warning: {warning}");
 		}
@@ -85,7 +88,7 @@ fn process_file(path: &std::path::Path, args: &Args) -> Result<bool> {
 			eprintln!("Extracted: {}", extract_path.display());
 		}
 
-		std::fs::write(path, &sorted).with_context(|| format!("Failed to write {}", path.display()))?;
+		std::fs::write(&path, &sorted).with_context(|| format!("Failed to write {}", path.display()))?;
 		eprintln!("Sorted: {}", path.display());
 	}
 
