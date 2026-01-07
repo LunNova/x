@@ -162,6 +162,7 @@ enum AdtItem {
 }
 
 struct EnumDeclaration {
+	pub derives: Vec<syn::Path>,
 	pub name: Ident,
 	pub generics: Option<Generics>,
 	pub pattern_param: Option<(Ident, Ident)>, // (param_name, trait_name) for "is <P: PatternFields>"
@@ -236,6 +237,20 @@ struct FieldAttributes {
 	pub unsafe_transmute_check_iter: Option<String>,
 }
 
+/// Extract derive macro paths from a list of attributes
+fn extract_derives(attrs: &[syn::Attribute]) -> Result<Vec<syn::Path>> {
+	let mut derives = Vec::new();
+	for attr in attrs {
+		if attr.path().is_ident("derive") {
+			attr.parse_nested_meta(|meta| {
+				derives.push(meta.path);
+				Ok(())
+			})?;
+		}
+	}
+	Ok(derives)
+}
+
 impl Parse for UseDeclaration {
 	fn parse(input: ParseStream) -> Result<Self> {
 		input.parse::<Token![use]>()?;
@@ -247,7 +262,7 @@ impl Parse for UseDeclaration {
 impl Parse for AdtItem {
 	fn parse(input: ParseStream) -> Result<Self> {
 		if input.peek(Token![enum]) {
-			Ok(AdtItem::EnumDeclaration(input.parse()?))
+			Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_derives(input, Vec::new())?))
 		} else if input.peek(Token![type]) {
 			// Disambiguate between pattern types and simple type aliases
 			let fork = input.fork();
@@ -266,18 +281,20 @@ impl Parse for AdtItem {
 		} else if input.peek(Token![impl]) {
 			Ok(AdtItem::SubtypeImpl(input.parse()?))
 		} else if input.peek(Token![#]) {
-			// This might be an attributed impl
-			let fork = input.fork();
-			// Skip past all attributes
-			while fork.peek(Token![#]) {
-				fork.parse::<Token![#]>()?;
-				let _content;
-				syn::bracketed!(_content in fork);
-			}
-			if fork.peek(Token![impl]) {
-				Ok(AdtItem::SubtypeImpl(input.parse()?))
+			// Parse outer attributes first
+			let attrs = syn::Attribute::parse_outer(input)?;
+
+			if input.peek(Token![impl]) {
+				// Re-inject attributes for SubtypeImplDeclaration parsing
+				// SubtypeImplDeclaration expects to parse its own attributes, so we need
+				// to handle this differently - it already handles #[derive(SubtypingRelation(...))]
+				// For now, extract derives and pass them, but SubtypeImpl has its own attr handling
+				Ok(AdtItem::SubtypeImpl(SubtypeImplDeclaration::parse_with_attrs(input, attrs)?))
+			} else if input.peek(Token![enum]) {
+				let derives = extract_derives(&attrs)?;
+				Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_derives(input, derives)?))
 			} else {
-				Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
+				Err(input.error("Expected 'enum' or 'impl' after attributes"))
 			}
 		} else {
 			Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
@@ -285,8 +302,8 @@ impl Parse for AdtItem {
 	}
 }
 
-impl Parse for EnumDeclaration {
-	fn parse(input: ParseStream) -> Result<Self> {
+impl EnumDeclaration {
+	fn parse_with_derives(input: ParseStream, derives: Vec<syn::Path>) -> Result<Self> {
 		// 'enum' keyword is now mandatory
 		input.parse::<Token![enum]>()?;
 
@@ -324,11 +341,18 @@ impl Parse for EnumDeclaration {
 		let parts = input.parse::<EnumBody>()?;
 
 		Ok(EnumDeclaration {
+			derives,
 			name,
 			generics,
 			pattern_param,
 			parts,
 		})
+	}
+}
+
+impl Parse for EnumDeclaration {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Self::parse_with_derives(input, Vec::new())
 	}
 }
 
@@ -421,12 +445,9 @@ impl Parse for TypeAlias {
 	}
 }
 
-impl Parse for SubtypeImplDeclaration {
-	fn parse(input: ParseStream) -> Result<Self> {
+impl SubtypeImplDeclaration {
+	fn parse_with_attrs(input: ParseStream, attrs: Vec<syn::Attribute>) -> Result<Self> {
 		let mut attributes = Vec::new();
-
-		// Parse attributes using darling
-		let attrs = syn::Attribute::parse_outer(input)?;
 
 		for attr in attrs {
 			if attr.path().is_ident("derive") {
@@ -458,6 +479,13 @@ impl Parse for SubtypeImplDeclaration {
 			supertype,
 			attributes,
 		})
+	}
+}
+
+impl Parse for SubtypeImplDeclaration {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let attrs = syn::Attribute::parse_outer(input)?;
+		Self::parse_with_attrs(input, attrs)
 	}
 }
 
@@ -789,8 +817,15 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 
 		let full_generics = enum_decl.full_generics();
 
+		let derive_attr = if enum_decl.derives.is_empty() {
+			quote! { #[derive(Debug, Clone)] }
+		} else {
+			let paths = &enum_decl.derives;
+			quote! { #[derive(#(#paths),*)] }
+		};
+
 		output.extend(quote! {
-			#[derive(Debug, Clone)]
+			#derive_attr
 			#[repr(C)]
 			pub enum #enum_name #full_generics {
 				#(#expanded_variants),*
