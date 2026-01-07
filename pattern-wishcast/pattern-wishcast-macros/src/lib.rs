@@ -852,8 +852,8 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 		let enum_attrs = &enum_decl.attrs;
 
 		output.extend(quote! {
-			#(#enum_attrs)*
 			#derive_attr
+			#(#enum_attrs)*
 			#[repr(C)]
 			pub enum #enum_name #full_generics {
 				#(#expanded_variants),*
