@@ -32,10 +32,16 @@ compile-time subtyping relationships between enums with conditionally uninhabite
 
 ```rust
 pattern_wishcast::pattern_wishcast! {
+    /// Evaluation states that block further progress
+    #[derive(Debug, Clone, PartialEq)]
     enum StuckEvaluation = {
       BoundVar(String)
     };
+
+    /// Main value type with pattern-based strictness
+    #[derive(Debug, Clone, PartialEq)]
     enum Value is <P: PatternFields> = StuckEvaluation | {
+        /// Numeric literal
         Number { value: i32 },
         Boolean { value: bool },
         // Vec<Self> applies the pattern recursively!

@@ -33,7 +33,7 @@ pub fn generate_strictness_system(
 	}
 
 	output.extend(quote! {
-		pub trait #strictness_trait_name: Clone + Copy + std::fmt::Debug {
+		pub trait #strictness_trait_name: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
 			#(#strictness_assoc_types)*
 		}
 	});
@@ -42,7 +42,7 @@ pub fn generate_strictness_system(
 	// Also generate the unrestricted type
 	let unrestricted_type_name = syn::Ident::new(&format!("{enum_name}Type"), enum_name.span());
 	output.extend(quote! {
-		#[derive(Debug, Clone, Copy)]
+		#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 		pub struct #unrestricted_type_name;
 	});
 
@@ -68,7 +68,7 @@ pub fn generate_strictness_system(
 
 		// Generate strictness type
 		output.extend(quote! {
-			#[derive(Debug, Clone, Copy)]
+			#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 			pub struct #strictness_type_name;
 		});
 
