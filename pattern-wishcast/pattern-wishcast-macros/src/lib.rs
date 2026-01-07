@@ -162,6 +162,7 @@ enum AdtItem {
 }
 
 struct EnumDeclaration {
+	pub attrs: Vec<syn::Attribute>,
 	pub derives: Vec<syn::Path>,
 	pub name: Ident,
 	pub generics: Option<Generics>,
@@ -221,6 +222,7 @@ enum SubtypeAttribute {
 
 #[derive(Clone)]
 struct Variant {
+	pub attrs: Vec<syn::Attribute>,
 	pub name: Ident,
 	pub fields: Option<VariantFields>,
 }
@@ -233,22 +235,26 @@ enum VariantFields {
 
 #[derive(Clone, Default)]
 struct FieldAttributes {
+	pub attrs: Vec<syn::Attribute>,
 	/// Safety-critical iteration expression for pattern checking
 	pub unsafe_transmute_check_iter: Option<String>,
 }
 
-/// Extract derive macro paths from a list of attributes
-fn extract_derives(attrs: &[syn::Attribute]) -> Result<Vec<syn::Path>> {
+/// Extract derive macro paths from attributes, returning (derives, other_attrs)
+fn extract_derives(attrs: Vec<syn::Attribute>) -> Result<(Vec<syn::Path>, Vec<syn::Attribute>)> {
 	let mut derives = Vec::new();
+	let mut other_attrs = Vec::new();
 	for attr in attrs {
 		if attr.path().is_ident("derive") {
 			attr.parse_nested_meta(|meta| {
 				derives.push(meta.path);
 				Ok(())
 			})?;
+		} else {
+			other_attrs.push(attr);
 		}
 	}
-	Ok(derives)
+	Ok((derives, other_attrs))
 }
 
 impl Parse for UseDeclaration {
@@ -262,7 +268,11 @@ impl Parse for UseDeclaration {
 impl Parse for AdtItem {
 	fn parse(input: ParseStream) -> Result<Self> {
 		if input.peek(Token![enum]) {
-			Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_derives(input, Vec::new())?))
+			Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
+				input,
+				Vec::new(),
+				Vec::new(),
+			)?))
 		} else if input.peek(Token![type]) {
 			// Disambiguate between pattern types and simple type aliases
 			let fork = input.fork();
@@ -291,8 +301,12 @@ impl Parse for AdtItem {
 				// For now, extract derives and pass them, but SubtypeImpl has its own attr handling
 				Ok(AdtItem::SubtypeImpl(SubtypeImplDeclaration::parse_with_attrs(input, attrs)?))
 			} else if input.peek(Token![enum]) {
-				let derives = extract_derives(&attrs)?;
-				Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_derives(input, derives)?))
+				let (derives, other_attrs) = extract_derives(attrs)?;
+				Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
+					input,
+					derives,
+					other_attrs,
+				)?))
 			} else {
 				Err(input.error("Expected 'enum' or 'impl' after attributes"))
 			}
@@ -303,7 +317,7 @@ impl Parse for AdtItem {
 }
 
 impl EnumDeclaration {
-	fn parse_with_derives(input: ParseStream, derives: Vec<syn::Path>) -> Result<Self> {
+	fn parse_with_attrs(input: ParseStream, derives: Vec<syn::Path>, attrs: Vec<syn::Attribute>) -> Result<Self> {
 		// 'enum' keyword is now mandatory
 		input.parse::<Token![enum]>()?;
 
@@ -341,6 +355,7 @@ impl EnumDeclaration {
 		let parts = input.parse::<EnumBody>()?;
 
 		Ok(EnumDeclaration {
+			attrs,
 			derives,
 			name,
 			generics,
@@ -352,7 +367,7 @@ impl EnumDeclaration {
 
 impl Parse for EnumDeclaration {
 	fn parse(input: ParseStream) -> Result<Self> {
-		Self::parse_with_derives(input, Vec::new())
+		Self::parse_with_attrs(input, Vec::new(), Vec::new())
 	}
 }
 
@@ -516,6 +531,9 @@ impl Parse for AdtCompose {
 
 impl Parse for Variant {
 	fn parse(input: ParseStream) -> Result<Self> {
+		// Parse variant-level attributes (including doc comments)
+		let attrs = syn::Attribute::parse_outer(input)?;
+
 		let name: Ident = input.parse()?;
 
 		let fields = if input.peek(syn::token::Brace) {
@@ -524,11 +542,14 @@ impl Parse for Variant {
 			let mut named_fields = Vec::new();
 
 			while !content.is_empty() {
-				// Parse field attributes
-				let attrs = syn::Attribute::parse_outer(&content)?;
-				let mut field_attrs = FieldAttributes::default();
+				// Parse field attributes (including doc comments)
+				let field_outer_attrs = syn::Attribute::parse_outer(&content)?;
+				let mut field_attrs = FieldAttributes {
+					attrs: field_outer_attrs.clone(),
+					..Default::default()
+				};
 
-				for attr in attrs {
+				for attr in &field_outer_attrs {
 					if attr.path().is_ident("unsafe_transmute_check") {
 						// Parse the attribute content
 						attr.parse_nested_meta(|meta| {
@@ -562,7 +583,7 @@ impl Parse for Variant {
 			None
 		};
 
-		Ok(Variant { name, fields })
+		Ok(Variant { attrs, name, fields })
 	}
 }
 
@@ -664,6 +685,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 					has_type_composition = true;
 					variant_names.insert(type_name.to_string());
 					enum_variants.push(Variant {
+						attrs: Vec::new(),
 						name: type_name.clone(),
 						fields: Some(VariantFields::Unnamed(vec![syn::parse_quote! { #type_name #generics }])),
 					});
@@ -672,6 +694,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 					has_type_composition = true;
 					variant_names.insert(type_name.to_string());
 					enum_variants.push(Variant {
+						attrs: Vec::new(),
 						name: type_name.clone(),
 						fields: Some(VariantFields::Unnamed(vec![syn::parse_quote! { Box<#type_name> }])),
 					});
@@ -742,6 +765,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 						};
 
 						modified_variants.push(Variant {
+							attrs: variant.attrs.clone(),
 							name: variant_name.clone(),
 							fields: Some(VariantFields::Unnamed(vec![
 								original_field_type,
@@ -757,6 +781,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 						};
 
 						modified_variants.push(Variant {
+							attrs: variant.attrs.clone(),
 							name: variant_name.clone(),
 							fields: Some(VariantFields::Unnamed(vec![original_field_type])),
 						});
@@ -824,7 +849,10 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 			quote! { #[derive(#(#paths),*)] }
 		};
 
+		let enum_attrs = &enum_decl.attrs;
+
 		output.extend(quote! {
+			#(#enum_attrs)*
 			#derive_attr
 			#[repr(C)]
 			pub enum #enum_name #full_generics {

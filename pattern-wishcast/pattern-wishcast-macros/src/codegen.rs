@@ -67,28 +67,38 @@ pub fn get_all_variants(parts: &[CompositionPart]) -> Vec<&Variant> {
 	all_variants
 }
 
+/// Filter out macro-internal attributes that shouldn't be emitted to output
+fn filter_internal_attrs(attrs: &[syn::Attribute]) -> Vec<&syn::Attribute> {
+	attrs
+		.iter()
+		.filter(|attr| !attr.path().is_ident("unsafe_transmute_check"))
+		.collect()
+}
+
 /// Generic variant expansion with customizable type transformation
 pub fn expand_variant_with<F>(variant: &Variant, mut type_transformer: F) -> TokenStream2
 where
 	F: FnMut(&syn::Type) -> TokenStream2,
 {
 	let name = &variant.name;
+	let variant_attrs = filter_internal_attrs(&variant.attrs);
 
 	match &variant.fields {
-		None => quote! { #name },
+		None => quote! { #(#variant_attrs)* #name },
 		Some(VariantFields::Named(fields)) => {
 			let field_tokens: Vec<_> = fields
 				.iter()
-				.map(|(fname, ftype, _attrs)| {
+				.map(|(fname, ftype, field_attrs)| {
 					let transformed_type = type_transformer(ftype);
-					quote! { #fname: #transformed_type }
+					let attrs = filter_internal_attrs(&field_attrs.attrs);
+					quote! { #(#attrs)* #fname: #transformed_type }
 				})
 				.collect();
-			quote! { #name { #(#field_tokens),* } }
+			quote! { #(#variant_attrs)* #name { #(#field_tokens),* } }
 		}
 		Some(VariantFields::Unnamed(types)) => {
 			let transformed_types: Vec<_> = types.iter().map(type_transformer).collect();
-			quote! { #name(#(#transformed_types),*) }
+			quote! { #(#variant_attrs)* #name(#(#transformed_types),*) }
 		}
 	}
 }
