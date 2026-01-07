@@ -6,16 +6,20 @@ use pattern_wishcast::pattern_wishcast;
 use std::collections::HashSet;
 
 pattern_wishcast! {
-	// Custom derives: Debug, Clone, PartialEq, Eq, Hash
+	/// Enum with custom derives and doc comments
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 	enum WithCustomDerives = {
+		/// Unit variant
 		Unit,
+		/// Variant with a field
 		WithField { value: i32 },
 	};
 
-	// Default derives (Debug, Clone) - no explicit #[derive]
+	/// Enum with default derives
 	enum WithDefaultDerives = {
+		/// Unit variant
 		Unit,
+		/// Variant with a field
 		WithField { value: i32 },
 	};
 }
