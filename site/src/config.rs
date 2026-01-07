@@ -12,11 +12,29 @@ pub struct Args {
 	pub command: Command,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct BlogConfig {
+	pub site: SiteConfig,
+	pub features: Option<FeaturesConfig>,
+	pub theme: Option<ThemeConfig>,
+	pub extra: Option<serde_json::Value>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct FeaturesConfig {
+	pub wiki_links: Option<bool>,
+}
+
 #[derive(FromArgs)]
-#[argh(subcommand)]
-pub enum Command {
-	Serve(ServeArgs),
-	Render(RenderArgs),
+#[argh(subcommand, name = "render")]
+/// Render the blog to static files
+pub struct RenderArgs {
+	#[argh(positional)]
+	/// path to the blog directory
+	pub blog_dir: String,
+	#[argh(positional)]
+	/// path to the output directory
+	pub output_dir: String,
 }
 
 #[derive(FromArgs)]
@@ -34,26 +52,6 @@ pub struct ServeArgs {
 	pub domain: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "render")]
-/// Render the blog to static files
-pub struct RenderArgs {
-	#[argh(positional)]
-	/// path to the blog directory
-	pub blog_dir: String,
-	#[argh(positional)]
-	/// path to the output directory
-	pub output_dir: String,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct BlogConfig {
-	pub site: SiteConfig,
-	pub features: Option<FeaturesConfig>,
-	pub theme: Option<ThemeConfig>,
-	pub extra: Option<serde_json::Value>,
-}
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct SiteConfig {
 	pub title: String,
@@ -65,11 +63,13 @@ pub struct SiteConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct FeaturesConfig {
-	pub wiki_links: Option<bool>,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ThemeConfig {
 	pub dir: String,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand)]
+pub enum Command {
+	Serve(ServeArgs),
+	Render(RenderArgs),
 }
