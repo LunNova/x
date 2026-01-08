@@ -19,7 +19,7 @@ name = "cargo-shipshape"
 path = "src/main.rs"
 
 [dependencies]
-ra_ap_syntax = "0.0.312"
+ra_ap_syntax = "0.0.313"
 argh = "0.1"
 anyhow = "1.0"
 similar = "2.7"
