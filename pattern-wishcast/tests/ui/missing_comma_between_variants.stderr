@@ -1,0 +1,5 @@
+error: Expected ',' between variants
+  --> tests/ui/missing_comma_between_variants.rs:10:3
+   |
+10 |         Bar
+   |         ^^^

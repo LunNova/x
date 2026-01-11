@@ -1,0 +1,5 @@
+error: unexpected end of input, Empty enum body
+ --> tests/ui/empty_enum_body.rs:8:17
+  |
+8 |     enum Empty = { };
+  |                    ^
