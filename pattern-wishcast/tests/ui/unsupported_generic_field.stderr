@@ -1,4 +1,4 @@
-error: Unsupported field type: HashMap containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. Field: data
+error: Unsupported field type: HashMap containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. Use #[unsafe_transmute_check(iter="...")] to provide custom checking.
   --> tests/ui/unsupported_generic_field.rs:10:1
    |
 10 | / pattern_wishcast! {

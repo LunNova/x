@@ -32,73 +32,82 @@ pub fn generate_field_check(
 			}
 		});
 	}
-	if let syn::Type::Path(type_path) = field_type
+
+	// Use recursive helper to generate check code
+	generate_check_for_type(field_type, quote! { #field_name }, check_method, enum_name, 0)
+}
+
+/// Recursively generate check code for a type, handling nested containers.
+/// `var_expr` is the expression to access the value (e.g., `field_name`, `elem`, `(*box_val)`).
+/// `depth` prevents infinite recursion.
+fn generate_check_for_type(
+	ty: &syn::Type,
+	var_expr: TokenStream2,
+	check_method: &Ident,
+	enum_name: &Ident,
+	depth: usize,
+) -> Option<TokenStream2> {
+	const MAX_DEPTH: usize = 10;
+	if depth > MAX_DEPTH {
+		return Some(quote! {
+			compile_error!("Type nesting too deep for automatic field checking. Use #[unsafe_transmute_check(iter=\"...\")].");
+		});
+	}
+
+	// Direct Value type check
+	if is_value_type(ty, enum_name) {
+		return Some(quote! {
+			#var_expr.#check_method()?;
+		});
+	}
+
+	if let syn::Type::Path(type_path) = ty
 		&& let Some(segment) = type_path.path.segments.last()
 	{
-		match segment.ident.to_string().as_str() {
-			"Vec" => {
-				// Vec<T> where T might be a Value type
-				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
-					&& is_value_type(inner_type, enum_name)
-				{
-					return Some(quote! {
-						for elem in #field_name {
-							elem.#check_method()?;
-						}
-					});
-				}
-			}
-			"Box" => {
-				// Box<T> where T might be a Value type
-				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
-					&& is_value_type(inner_type, enum_name)
-				{
-					return Some(quote! {
-						#field_name.#check_method()?;
-					});
-				}
-			}
-			"Option" => {
-				// Option<T> where T might be a Value type
-				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-					&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
-					&& is_value_type(inner_type, enum_name)
-				{
-					return Some(quote! {
-						if let Some(ref value) = #field_name {
-							value.#check_method()?;
-						}
-					});
-				}
-			}
-			_ => {
-				// Direct Value type (like Self, Value<S>)
-				if is_value_type(field_type, enum_name) {
-					return Some(quote! {
-						#field_name.#check_method()?;
-					});
-				}
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+			&& let Some(syn::GenericArgument::Type(inner_type)) = args.args.first()
+		{
+			let inner_var = syn::Ident::new(&format!("__check_{depth}"), proc_macro2::Span::call_site());
 
-				// Check for unknown generic types that contain Self/Value types
-				if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-					for arg in &args.args {
-						if let syn::GenericArgument::Type(inner_type) = arg
-							&& contains_value_type(inner_type, enum_name)
-						{
-							// Error: unsupported generic type containing Self/Value
-							let type_name = &segment.ident;
-							return Some(quote! {
-								compile_error!(concat!(
-									"Unsupported field type: ",
-									stringify!(#type_name),
-									" containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. ",
-									"Field: ",
-									stringify!(#field_name)
-								));
-							});
-						}
+			match segment.ident.to_string().as_str() {
+				"Vec" => {
+					// var_expr is already &Vec from pattern matching, so iterate directly
+					if let Some(inner_check) = generate_check_for_type(inner_type, quote! { #inner_var }, check_method, enum_name, depth + 1) {
+						return Some(quote! {
+							for #inner_var in #var_expr {
+								#inner_check
+							}
+						});
+					}
+				}
+				"Box" => {
+					// For Box<T>, rely on auto-deref for method calls
+					// The inner_var will be &Box<T> or Box<T>, and auto-deref finds the method on T
+					if let Some(inner_check) = generate_check_for_type(inner_type, quote! { #var_expr }, check_method, enum_name, depth + 1) {
+						return Some(inner_check);
+					}
+				}
+				"Option" => {
+					if let Some(inner_check) = generate_check_for_type(inner_type, quote! { #inner_var }, check_method, enum_name, depth + 1) {
+						return Some(quote! {
+							if let Some(ref #inner_var) = *#var_expr {
+								#inner_check
+							}
+						});
+					}
+				}
+				_ => {
+					// Unknown container - check if it contains Value types and error
+					if contains_value_type(ty, enum_name) {
+						let type_name = &segment.ident;
+						return Some(quote! {
+							compile_error!(concat!(
+								"Unsupported field type: ",
+								stringify!(#type_name),
+								" containing Value types. Only Vec<T>, Box<T>, and Option<T> are supported for generic containers. ",
+								"Use #[unsafe_transmute_check(iter=\"...\")] to provide custom checking."
+							));
+						});
 					}
 				}
 			}
