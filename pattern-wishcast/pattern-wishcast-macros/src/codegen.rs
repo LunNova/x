@@ -54,18 +54,6 @@ pub fn generate_from_traits(output: &mut TokenStream2, enum_decl: &EnumDeclarati
 	}
 }
 
-/// Helper function to extract all inline variants from composition parts
-pub fn get_all_variants(parts: &[CompositionPart]) -> Vec<&Variant> {
-	parts
-		.iter()
-		.filter_map(|part| match part {
-			CompositionPart::InlineVariants { variants } => Some(variants.iter()),
-			_ => None,
-		})
-		.flatten()
-		.collect()
-}
-
 /// Filter out macro-internal attributes that shouldn't be emitted to output
 fn filter_internal_attrs(attrs: &[syn::Attribute]) -> Vec<&syn::Attribute> {
 	attrs

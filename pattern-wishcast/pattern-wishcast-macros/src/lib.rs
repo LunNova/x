@@ -822,7 +822,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 				(enum_variants.clone(), Box::new(|ty| quote! { #ty }))
 			} else {
 				(
-					codegen::get_all_variants(&enum_decl.parts.0).into_iter().cloned().collect(),
+					enum_variants.clone(),
 					Box::new(|ty| codegen::fix_concrete_references(ty, &enum_map)),
 				)
 			}
