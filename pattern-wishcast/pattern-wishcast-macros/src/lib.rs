@@ -39,8 +39,6 @@ enum VariantPattern {
 
 impl VariantPattern {
 	fn parse_variant_with_pattern(input: syn::parse::ParseStream) -> syn::Result<Ident> {
-		use syn::Token;
-
 		let variant: Ident = input.parse()?;
 
 		// Handle pattern like (_) after variant name
@@ -91,8 +89,6 @@ impl VariantPattern {
 	}
 
 	pub fn parse_is_pattern(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		use syn::Token;
-
 		// Look for "is"
 		let is_ident: Ident = input.parse()?;
 		if is_ident != "is" {
@@ -132,8 +128,6 @@ struct PatternTypeDeclaration {
 
 impl syn::parse::Parse for PatternTypeDeclaration {
 	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		use syn::Token;
-
 		input.parse::<Token![type]>()?;
 		let name: Ident = input.parse()?;
 		input.parse::<Token![=]>()?;
@@ -885,14 +879,7 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 			generate_subtype_conversions(&mut output, enum_decl, &enum_variants, &conditional_variants, &subtype_impls);
 
 			// Generate automatic tests for subtyping relationships
-			generate_subtyping_tests(
-				&mut output,
-				enum_decl,
-				&enum_variants,
-				&conditional_variants,
-				&subtype_impls,
-				&enum_map,
-			);
+			generate_subtyping_tests(&mut output, &enum_variants, &conditional_variants, &subtype_impls, &enum_map);
 		}
 	}
 
@@ -1075,7 +1062,6 @@ fn generate_subtype_conversions(
 /// Generate automatic test code for subtyping relationships to verify transmute safety
 fn generate_subtyping_tests(
 	output: &mut TokenStream2,
-	_enum_decl: &EnumDeclaration,
 	enum_variants: &[Variant],
 	conditional_variants: &std::collections::HashSet<String>,
 	subtype_impls: &[&SubtypeImplDeclaration],

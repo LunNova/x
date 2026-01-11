@@ -109,41 +109,29 @@ pub fn generate_field_check(
 
 /// Check if a type is a Value type that needs strictness checking
 pub fn is_value_type(ty: &syn::Type, enum_name: &Ident) -> bool {
-	match ty {
-		syn::Type::Path(type_path) => {
-			if let Some(segment) = type_path.path.segments.last() {
-				segment.ident == "Self" || segment.ident == *enum_name
-			} else {
-				false
-			}
-		}
-		_ => false,
+	if let syn::Type::Path(type_path) = ty
+		&& let Some(segment) = type_path.path.segments.last()
+	{
+		segment.ident == "Self" || segment.ident == *enum_name
+	} else {
+		false
 	}
 }
 
 /// Check if a type contains Value types anywhere in its structure (recursively)
 pub fn contains_value_type(ty: &syn::Type, enum_name: &Ident) -> bool {
-	match ty {
-		syn::Type::Path(type_path) => {
-			// First check if this is directly a Value type
-			if is_value_type(ty, enum_name) {
-				return true;
-			}
+	if is_value_type(ty, enum_name) {
+		return true;
+	}
 
-			// Then check if any generic arguments contain Value types
-			if let Some(segment) = type_path.path.segments.last()
-				&& let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-			{
-				for arg in &args.args {
-					if let syn::GenericArgument::Type(inner_type) = arg
-						&& contains_value_type(inner_type, enum_name)
-					{
-						return true;
-					}
-				}
-			}
-			false
-		}
-		_ => false,
+	if let syn::Type::Path(type_path) = ty
+		&& let Some(segment) = type_path.path.segments.last()
+		&& let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+	{
+		args.args
+			.iter()
+			.any(|arg| matches!(arg, syn::GenericArgument::Type(inner_type) if contains_value_type(inner_type, enum_name)))
+	} else {
+		false
 	}
 }

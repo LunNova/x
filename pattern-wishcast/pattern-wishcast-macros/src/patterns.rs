@@ -24,13 +24,13 @@ pub fn generate_strictness_system(
 		syn::Ident::new(&format!("{enum_name}Strictness"), enum_name.span())
 	};
 
-	let mut strictness_assoc_types = Vec::new();
-	for conditional_variant in conditional_variants {
-		let assoc_type_name = syn::Ident::new(&format!("{conditional_variant}Allowed"), enum_name.span());
-		strictness_assoc_types.push(quote! {
-			type #assoc_type_name;
-		});
-	}
+	let strictness_assoc_types: Vec<_> = conditional_variants
+		.iter()
+		.map(|cv| {
+			let assoc_type_name = syn::Ident::new(&format!("{cv}Allowed"), enum_name.span());
+			quote! { type #assoc_type_name; }
+		})
+		.collect();
 
 	output.extend(quote! {
 		pub trait #strictness_trait_name: Clone + Copy + std::fmt::Debug + PartialEq + Eq + std::hash::Hash {
@@ -47,13 +47,13 @@ pub fn generate_strictness_system(
 	});
 
 	// Generate unrestricted trait impl (all variants allowed)
-	let mut unrestricted_assoc_type_impls = Vec::new();
-	for conditional_variant in conditional_variants {
-		let assoc_type_name = syn::Ident::new(&format!("{conditional_variant}Allowed"), enum_name.span());
-		unrestricted_assoc_type_impls.push(quote! {
-			type #assoc_type_name = ();
-		});
-	}
+	let unrestricted_assoc_type_impls: Vec<_> = conditional_variants
+		.iter()
+		.map(|cv| {
+			let assoc_type_name = syn::Ident::new(&format!("{cv}Allowed"), enum_name.span());
+			quote! { type #assoc_type_name = (); }
+		})
+		.collect();
 
 	output.extend(quote! {
 		impl #strictness_trait_name for #unrestricted_type_name {
@@ -116,25 +116,14 @@ pub fn generate_strictness_system(
 
 /// Identify which variants appear in patterns as conditional
 pub fn identify_conditional_variants(pattern_types: &[&PatternTypeDeclaration], all_variant_names: &HashSet<String>) -> HashSet<String> {
-	let mut conditional_variants = HashSet::new();
-
-	for pattern_type in pattern_types {
-		match &pattern_type.pattern {
-			VariantPattern::Wildcard => {
-				// Explicit wildcard - includes all variants, so no conditionals from this pattern
-			}
+	pattern_types
+		.iter()
+		.flat_map(|pt| match &pt.pattern {
+			VariantPattern::Wildcard => Vec::new(),
 			VariantPattern::Variants(variants) => {
-				// Variants NOT in this subset are conditional
 				let pattern_variant_names: HashSet<String> = variants.iter().map(|v| v.to_string()).collect();
-
-				for variant_name in all_variant_names {
-					if !pattern_variant_names.contains(variant_name) {
-						conditional_variants.insert(variant_name.clone());
-					}
-				}
+				all_variant_names.difference(&pattern_variant_names).cloned().collect()
 			}
-		}
-	}
-
-	conditional_variants
+		})
+		.collect()
 }
