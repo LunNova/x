@@ -913,8 +913,6 @@ fn generate_subtype_conversions(
 	pattern_types: &[&PatternTypeDeclaration],
 ) {
 	let enum_name = &enum_decl.name;
-
-	// Build a map from pattern type name to allowed variants
 	let pattern_allowed_variants: std::collections::HashMap<String, Option<std::collections::HashSet<String>>> = pattern_types
 		.iter()
 		.map(|pt| {
@@ -941,7 +939,6 @@ fn generate_subtype_conversions(
 						&& allowed_variants.is_some_and(|allowed| !allowed.contains(&variant_name_str));
 
 					if is_rejected {
-						// This conditional variant is not allowed in the target pattern
 						quote! {
 							#supertype::#variant_name { .. } => Err(()),
 						}
@@ -1059,7 +1056,6 @@ fn generate_subtype_conversions(
 			});
 
 			// Generate checked downcast conversions (supertype -> subtype)
-			// Look up which variants are allowed in the target subtype pattern
 			let subtype_allowed = pattern_allowed_variants.get(&subtype.to_string()).and_then(|opt| opt.as_ref());
 			let variant_checks = generate_variant_checks(supertype, &check_ident, subtype_allowed);
 
