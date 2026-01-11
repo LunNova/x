@@ -883,7 +883,14 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 			));
 
 			// Generate conversion methods
-			generate_subtype_conversions(&mut output, enum_decl, &enum_variants, &conditional_variants, &subtype_impls);
+			generate_subtype_conversions(
+				&mut output,
+				enum_decl,
+				&enum_variants,
+				&conditional_variants,
+				&subtype_impls,
+				&enum_pattern_types,
+			);
 
 			// Generate automatic tests for subtyping relationships
 			generate_subtyping_tests(&mut output, &enum_variants, &conditional_variants, &subtype_impls, &enum_map);
@@ -908,88 +915,115 @@ fn generate_subtype_conversions(
 	enum_variants: &[Variant],
 	conditional_variants: &std::collections::HashSet<String>,
 	subtype_impls: &[&SubtypeImplDeclaration],
+	pattern_types: &[&PatternTypeDeclaration],
 ) {
 	let enum_name = &enum_decl.name;
 
+	// Build a map from pattern type name to allowed variants
+	let pattern_allowed_variants: std::collections::HashMap<String, Option<std::collections::HashSet<String>>> = pattern_types
+		.iter()
+		.map(|pt| {
+			let allowed = match &pt.pattern {
+				VariantPattern::Wildcard => None, // All variants allowed
+				VariantPattern::Variants(variants) => Some(variants.iter().map(|v| v.to_string()).collect()),
+			};
+			(pt.name.to_string(), allowed)
+		})
+		.collect();
+
 	// Helper function to generate variant checks for a given check method
-	let generate_variant_checks = |supertype: &Ident, check_ident: &Ident| -> Vec<TokenStream2> {
-		enum_variants
-			.iter()
-			.map(|variant| {
-				let variant_name = &variant.name;
-				let variant_name_str = variant_name.to_string();
+	// `allowed_variants` is the set of variants allowed in the target pattern (None = wildcard)
+	let generate_variant_checks =
+		|supertype: &Ident, check_ident: &Ident, allowed_variants: Option<&std::collections::HashSet<String>>| -> Vec<TokenStream2> {
+			enum_variants
+				.iter()
+				.map(|variant| {
+					let variant_name = &variant.name;
+					let variant_name_str = variant_name.to_string();
 
-				if conditional_variants.contains(&variant_name_str) {
-					// Conditional variants are always rejected
-					quote! {
-						#supertype::#variant_name { .. } => Err(()),
+					// A variant is rejected if it's conditional AND not in the target pattern's allowed list
+					let is_rejected = conditional_variants.contains(&variant_name_str)
+						&& allowed_variants.is_some_and(|allowed| !allowed.contains(&variant_name_str));
+
+					if is_rejected {
+						// This conditional variant is not allowed in the target pattern
+						quote! {
+							#supertype::#variant_name { .. } => Err(()),
+						}
+					} else {
+						// Generate recursive checking for allowed variants
+						// Note: conditional variants have a _never field added, so use { .. } pattern
+						let is_conditional = conditional_variants.contains(&variant_name_str);
+						match &variant.fields {
+							None => {
+								// Unit variant - but if conditional, it has _never field added
+								if is_conditional {
+									quote! {
+										#supertype::#variant_name { .. } => Ok(()),
+									}
+								} else {
+									quote! {
+										#supertype::#variant_name => Ok(()),
+									}
+								}
+							}
+							Some(VariantFields::Named(fields)) => {
+								let field_checks_with_names: Vec<_> = fields
+									.iter()
+									.filter_map(|(field_name, field_type, field_attrs)| {
+										field_checking::generate_field_check(field_name, field_type, field_attrs, check_ident, enum_name)
+											.map(|check| (field_name, check))
+									})
+									.collect();
+
+								if field_checks_with_names.is_empty() {
+									quote! {
+										#supertype::#variant_name { .. } => Ok(()),
+									}
+								} else {
+									let field_names: Vec<_> = field_checks_with_names.iter().map(|(name, _)| name).collect();
+									let field_checks: Vec<_> = field_checks_with_names.iter().map(|(_, check)| check).collect();
+									quote! {
+										#supertype::#variant_name { #(#field_names),*, .. } => {
+											#(#field_checks)*
+											Ok(())
+										},
+									}
+								}
+							}
+							Some(VariantFields::Unnamed(types)) => {
+								let field_names: Vec<_> = (0..types.len())
+									.map(|i| syn::Ident::new(&format!("field_{i}"), variant_name.span()))
+									.collect();
+								let field_checks: Vec<_> = types
+									.iter()
+									.enumerate()
+									.filter_map(|(i, field_type)| {
+										let field_name = &field_names[i];
+										let default_attrs = FieldAttributes::default();
+										field_checking::generate_field_check(field_name, field_type, &default_attrs, check_ident, enum_name)
+									})
+									.collect();
+
+								if field_checks.is_empty() {
+									// Use wildcard pattern when no field checks are needed
+									quote! {
+										#supertype::#variant_name(..) => Ok(()),
+									}
+								} else {
+									quote! {
+										#supertype::#variant_name(#(#field_names),*) => {
+											#(#field_checks)*
+											Ok(())
+										},
+									}
+								}
+							}
+						}
 					}
-				} else {
-					// Generate recursive checking for allowed variants
-					match &variant.fields {
-						None => {
-							// Unit variant - always valid
-							quote! {
-								#supertype::#variant_name => Ok(()),
-							}
-						}
-						Some(VariantFields::Named(fields)) => {
-							let field_checks_with_names: Vec<_> = fields
-								.iter()
-								.filter_map(|(field_name, field_type, field_attrs)| {
-									field_checking::generate_field_check(field_name, field_type, field_attrs, check_ident, enum_name)
-										.map(|check| (field_name, check))
-								})
-								.collect();
-
-							if field_checks_with_names.is_empty() {
-								quote! {
-									#supertype::#variant_name { .. } => Ok(()),
-								}
-							} else {
-								let field_names: Vec<_> = field_checks_with_names.iter().map(|(name, _)| name).collect();
-								let field_checks: Vec<_> = field_checks_with_names.iter().map(|(_, check)| check).collect();
-								quote! {
-									#supertype::#variant_name { #(#field_names),*, .. } => {
-										#(#field_checks)*
-										Ok(())
-									},
-								}
-							}
-						}
-						Some(VariantFields::Unnamed(types)) => {
-							let field_names: Vec<_> = (0..types.len())
-								.map(|i| syn::Ident::new(&format!("field_{i}"), variant_name.span()))
-								.collect();
-							let field_checks: Vec<_> = types
-								.iter()
-								.enumerate()
-								.filter_map(|(i, field_type)| {
-									let field_name = &field_names[i];
-									let default_attrs = FieldAttributes::default();
-									field_checking::generate_field_check(field_name, field_type, &default_attrs, check_ident, enum_name)
-								})
-								.collect();
-
-							if field_checks.is_empty() {
-								// Use wildcard pattern when no field checks are needed
-								quote! {
-									#supertype::#variant_name(..) => Ok(()),
-								}
-							} else {
-								quote! {
-									#supertype::#variant_name(#(#field_names),*) => {
-										#(#field_checks)*
-										Ok(())
-									},
-								}
-							}
-						}
-					}
-				}
-			})
-			.collect()
-	};
+				})
+				.collect()
+		};
 
 	// Generate conversion methods based on subtype implementations specified in the macro
 	for subtype_impl in subtype_impls {
@@ -1030,7 +1064,9 @@ fn generate_subtype_conversions(
 			});
 
 			// Generate checked downcast conversions (supertype -> subtype)
-			let variant_checks = generate_variant_checks(supertype, &check_ident);
+			// Look up which variants are allowed in the target subtype pattern
+			let subtype_allowed = pattern_allowed_variants.get(&subtype.to_string()).and_then(|opt| opt.as_ref());
+			let variant_checks = generate_variant_checks(supertype, &check_ident, subtype_allowed);
 
 			output.extend(quote! {
 				impl #supertype {
