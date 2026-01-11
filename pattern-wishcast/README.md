@@ -88,6 +88,12 @@ why no mutable reference upcasting? upcasting `&mut SubType` to `&mut SuperType`
 2. violating `SubType`'s invariant that certain variants are uninhabited
 3. undefined behavior when the value is used as `SubType` again
 
+### historic soundness issues
+
+#### <0.0.1-pre.6: broken nested container field checking
+
+prior to 0.0.1-pre.6's emitted downcast methods for nested containers did not check their contents. excluded variants hidden inside nested containers would pass validation, allowing transmuting into uninhabited variants and falling out of matches that look exhaustive.
+
 ## limitations
 
 - only patterns that make entire variants conditional work. can't restrict a field to a range like real rust patterns
