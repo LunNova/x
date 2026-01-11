@@ -32,6 +32,56 @@ pattern_wishcast! {
 }
 
 #[test]
+fn test_box_self_field() {
+	// Test with boxed strict value
+	let boxed = StrictValue::BoxedValue {
+		boxed: Box::new(StrictValue::Unit),
+	};
+	let flex = boxed.to_flex();
+	assert!(flex.try_to_strict().is_ok(), "Boxed strict value should convert");
+
+	// Test with boxed stuck value (should fail)
+	let stuck = FlexValue::Stuck {
+		reason: "blocked".to_string(),
+		_never: (),
+	};
+	let boxed_stuck = FlexValue::BoxedValue { boxed: Box::new(stuck) };
+	assert!(
+		boxed_stuck.try_to_strict().is_err(),
+		"Box<Self> containing Stuck should fail conversion"
+	);
+}
+
+#[test]
+fn test_deeply_nested_structures() {
+	// Deeply nested: BoxedValue -> MaybeValue -> ListOfValues -> Unit
+	let deep = StrictValue::BoxedValue {
+		boxed: Box::new(StrictValue::MaybeValue {
+			inner: Some(Box::new(StrictValue::ListOfValues {
+				items: vec![Box::new(StrictValue::Unit)],
+			})),
+		}),
+	};
+
+	let flex = deep.to_flex();
+	assert!(flex.try_to_strict().is_ok(), "Deeply nested strict values should convert");
+
+	// Same structure but with Stuck deeply nested - must construct as FlexValue
+	let stuck = FlexValue::Stuck {
+		reason: "deep".to_string(),
+		_never: (),
+	};
+	let deep_stuck = FlexValue::BoxedValue {
+		boxed: Box::new(FlexValue::MaybeValue {
+			inner: Some(Box::new(FlexValue::ListOfValues {
+				items: vec![Box::new(stuck)],
+			})),
+		}),
+	};
+	assert!(deep_stuck.try_to_strict().is_err(), "Deeply nested Stuck should fail conversion");
+}
+
+#[test]
 fn test_option_box_self_field() {
 	// Test with Some containing a strict value - construct entirely as StrictValue
 	let with_some = StrictValue::MaybeValue {
@@ -86,54 +136,4 @@ fn test_vec_box_self_field() {
 		list_with_stuck.try_to_strict().is_err(),
 		"Vec<Box<Self>> containing Stuck should fail conversion"
 	);
-}
-
-#[test]
-fn test_box_self_field() {
-	// Test with boxed strict value
-	let boxed = StrictValue::BoxedValue {
-		boxed: Box::new(StrictValue::Unit),
-	};
-	let flex = boxed.to_flex();
-	assert!(flex.try_to_strict().is_ok(), "Boxed strict value should convert");
-
-	// Test with boxed stuck value (should fail)
-	let stuck = FlexValue::Stuck {
-		reason: "blocked".to_string(),
-		_never: (),
-	};
-	let boxed_stuck = FlexValue::BoxedValue { boxed: Box::new(stuck) };
-	assert!(
-		boxed_stuck.try_to_strict().is_err(),
-		"Box<Self> containing Stuck should fail conversion"
-	);
-}
-
-#[test]
-fn test_deeply_nested_structures() {
-	// Deeply nested: BoxedValue -> MaybeValue -> ListOfValues -> Unit
-	let deep = StrictValue::BoxedValue {
-		boxed: Box::new(StrictValue::MaybeValue {
-			inner: Some(Box::new(StrictValue::ListOfValues {
-				items: vec![Box::new(StrictValue::Unit)],
-			})),
-		}),
-	};
-
-	let flex = deep.to_flex();
-	assert!(flex.try_to_strict().is_ok(), "Deeply nested strict values should convert");
-
-	// Same structure but with Stuck deeply nested - must construct as FlexValue
-	let stuck = FlexValue::Stuck {
-		reason: "deep".to_string(),
-		_never: (),
-	};
-	let deep_stuck = FlexValue::BoxedValue {
-		boxed: Box::new(FlexValue::MaybeValue {
-			inner: Some(Box::new(FlexValue::ListOfValues {
-				items: vec![Box::new(stuck)],
-			})),
-		}),
-	};
-	assert!(deep_stuck.try_to_strict().is_err(), "Deeply nested Stuck should fail conversion");
 }

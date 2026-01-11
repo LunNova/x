@@ -39,24 +39,6 @@ pattern_wishcast! {
 }
 
 #[test]
-fn test_pattern_a_allows_only_a() {
-	// OnlyA is conditional (excluded from PatternB), so it has _never field
-	let a = PatternA::OnlyA { _never: () };
-	let flex = a.to_flex();
-	assert!(flex.clone().try_to_pattern_a().is_ok());
-	assert!(flex.try_to_pattern_b().is_err(), "OnlyA should not convert to PatternB");
-}
-
-#[test]
-fn test_pattern_b_allows_only_b() {
-	// OnlyB is conditional (excluded from PatternA), so it has _never field
-	let b = PatternB::OnlyB { _never: () };
-	let flex = b.to_flex_b();
-	assert!(flex.clone().try_to_pattern_b().is_ok());
-	assert!(flex.try_to_pattern_a().is_err(), "OnlyB should not convert to PatternA");
-}
-
-#[test]
 fn test_core_works_in_both() {
 	let core_a = PatternA::Core;
 	let flex_a = core_a.to_flex();
@@ -74,4 +56,22 @@ fn test_neither_fails_both() {
 	let neither = FlexValue::Neither { _never: () };
 	assert!(neither.clone().try_to_pattern_a().is_err());
 	assert!(neither.try_to_pattern_b().is_err());
+}
+
+#[test]
+fn test_pattern_a_allows_only_a() {
+	// OnlyA is conditional (excluded from PatternB), so it has _never field
+	let a = PatternA::OnlyA { _never: () };
+	let flex = a.to_flex();
+	assert!(flex.clone().try_to_pattern_a().is_ok());
+	assert!(flex.try_to_pattern_b().is_err(), "OnlyA should not convert to PatternB");
+}
+
+#[test]
+fn test_pattern_b_allows_only_b() {
+	// OnlyB is conditional (excluded from PatternA), so it has _never field
+	let b = PatternB::OnlyB { _never: () };
+	let flex = b.to_flex_b();
+	assert!(flex.clone().try_to_pattern_b().is_ok());
+	assert!(flex.try_to_pattern_a().is_err(), "OnlyB should not convert to PatternA");
 }

@@ -66,99 +66,6 @@ pattern_wishcast! {
 	impl CompleteValue : PartialValue;
 }
 
-/// Evaluation context for variable lookup
-#[derive(Debug, Clone)]
-pub struct EvalContext {
-	variables: std::collections::HashMap<String, PartialValue>,
-}
-
-impl Default for EvalContext {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
-impl EvalContext {
-	pub fn new() -> Self {
-		let mut ctx = Self {
-			variables: std::collections::HashMap::new(),
-		};
-
-		// Add built-in functions as special function values
-		ctx.add_builtin("add".to_string());
-		ctx.add_builtin("sub".to_string());
-		ctx.add_builtin("mul".to_string());
-
-		ctx
-	}
-
-	fn add_builtin(&mut self, name: String) {
-		// Create a builtin function marker
-		let builtin = PartialValue::Function {
-			param: format!("builtin_{name}"),
-			body: Box::new(PartialValue::unbound_var("builtin_implementation".to_string())),
-			captured_env: std::collections::HashMap::new(),
-		};
-		self.variables.insert(name, builtin);
-	}
-
-	pub fn bind(&mut self, name: String, value: PartialValue) {
-		self.variables.insert(name, value);
-	}
-
-	pub fn lookup(&self, name: &str) -> Option<&PartialValue> {
-		self.variables.get(name)
-	}
-}
-
-impl std::fmt::Display for EvalContext {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let mut sorted_vars: Vec<_> = self.variables.iter().collect();
-		sorted_vars.sort_by_key(|(name, _)| *name);
-
-		writeln!(f, "{{")?;
-		for (name, value) in sorted_vars {
-			writeln!(f, "  {name} = {value}")?;
-		}
-		write!(f, "}}")
-	}
-}
-
-impl<P: PatternFields> std::fmt::Display for Value<P> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Value::Number { value } => write!(f, "{value}"),
-			Value::Boolean { value } => write!(f, "{}", if *value { "true" } else { "false" }),
-			Value::Text { value } => write!(f, "\"{value}\""),
-			Value::Tuple { elements } => {
-				write!(f, "(")?;
-				for (i, elem) in elements.iter().enumerate() {
-					if i > 0 {
-						write!(f, ", ")?;
-					}
-					write!(f, "{elem}")?;
-				}
-				write!(f, ")")
-			}
-			Value::Function { param, .. } => {
-				if param.starts_with("builtin_") {
-					let builtin_name = param.strip_prefix("builtin_").unwrap();
-					write!(f, "⟨builtin: {builtin_name}⟩")
-				} else {
-					write!(f, "λ{param}.⟨function⟩")
-				}
-			}
-			Value::StuckEvaluation(stuck, _) => match stuck {
-				StuckEvaluation::Var { id } => write!(f, "?{id}"),
-				StuckEvaluation::UnboundVariable { name } => write!(f, "?{name}"),
-				StuckEvaluation::Application { func, arg } => {
-					write!(f, "({func}{arg})")
-				}
-			},
-		}
-	}
-}
-
 impl CompleteValue {
 	/// Create basic complete values
 	pub fn number(n: i32) -> Self {
@@ -195,6 +102,64 @@ impl CompleteValue {
 			CompleteValue::Boolean { value } => Some(*value),
 			_ => None,
 		}
+	}
+}
+
+/// Evaluation context for variable lookup
+#[derive(Debug, Clone)]
+pub struct EvalContext {
+	variables: std::collections::HashMap<String, PartialValue>,
+}
+
+impl EvalContext {
+	pub fn new() -> Self {
+		let mut ctx = Self {
+			variables: std::collections::HashMap::new(),
+		};
+
+		// Add built-in functions as special function values
+		ctx.add_builtin("add".to_string());
+		ctx.add_builtin("sub".to_string());
+		ctx.add_builtin("mul".to_string());
+
+		ctx
+	}
+
+	fn add_builtin(&mut self, name: String) {
+		// Create a builtin function marker
+		let builtin = PartialValue::Function {
+			param: format!("builtin_{name}"),
+			body: Box::new(PartialValue::unbound_var("builtin_implementation".to_string())),
+			captured_env: std::collections::HashMap::new(),
+		};
+		self.variables.insert(name, builtin);
+	}
+
+	pub fn bind(&mut self, name: String, value: PartialValue) {
+		self.variables.insert(name, value);
+	}
+
+	pub fn lookup(&self, name: &str) -> Option<&PartialValue> {
+		self.variables.get(name)
+	}
+}
+
+impl Default for EvalContext {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl std::fmt::Display for EvalContext {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut sorted_vars: Vec<_> = self.variables.iter().collect();
+		sorted_vars.sort_by_key(|(name, _)| *name);
+
+		writeln!(f, "{{")?;
+		for (name, value) in sorted_vars {
+			writeln!(f, "  {name} = {value}")?;
+		}
+		write!(f, "}}")
 	}
 }
 
@@ -331,6 +296,41 @@ impl PartialValue {
 	/// Check if this value is complete (fully evaluated, no stuck states)
 	pub fn is_complete(&self) -> bool {
 		self.try_to_complete_ref().is_ok()
+	}
+}
+
+impl<P: PatternFields> std::fmt::Display for Value<P> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Value::Number { value } => write!(f, "{value}"),
+			Value::Boolean { value } => write!(f, "{}", if *value { "true" } else { "false" }),
+			Value::Text { value } => write!(f, "\"{value}\""),
+			Value::Tuple { elements } => {
+				write!(f, "(")?;
+				for (i, elem) in elements.iter().enumerate() {
+					if i > 0 {
+						write!(f, ", ")?;
+					}
+					write!(f, "{elem}")?;
+				}
+				write!(f, ")")
+			}
+			Value::Function { param, .. } => {
+				if param.starts_with("builtin_") {
+					let builtin_name = param.strip_prefix("builtin_").unwrap();
+					write!(f, "⟨builtin: {builtin_name}⟩")
+				} else {
+					write!(f, "λ{param}.⟨function⟩")
+				}
+			}
+			Value::StuckEvaluation(stuck, _) => match stuck {
+				StuckEvaluation::Var { id } => write!(f, "?{id}"),
+				StuckEvaluation::UnboundVariable { name } => write!(f, "?{name}"),
+				StuckEvaluation::Application { func, arg } => {
+					write!(f, "({func}{arg})")
+				}
+			},
+		}
 	}
 }
 

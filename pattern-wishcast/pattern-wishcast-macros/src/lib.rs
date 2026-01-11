@@ -2,6 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod codegen;
+
+mod field_checking;
+
+mod patterns;
+
 use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
@@ -15,9 +21,351 @@ use syn::{
 
 use darling::FromMeta;
 
-mod codegen;
-mod field_checking;
-mod patterns;
+struct AdtCompose {
+	uses: Vec<UseDeclaration>,
+	items: Vec<AdtItem>,
+}
+
+impl Parse for AdtCompose {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let mut uses = Vec::new();
+		let mut items = Vec::new();
+
+		// Parse use declarations first
+		while input.peek(Token![use]) {
+			uses.push(input.parse::<UseDeclaration>()?);
+			if input.peek(Token![;]) {
+				input.parse::<Token![;]>()?;
+			}
+		}
+
+		// Parse items
+		while !input.is_empty() {
+			items.push(input.parse::<AdtItem>()?);
+			if input.peek(Token![;]) {
+				input.parse::<Token![;]>()?;
+			}
+		}
+
+		Ok(AdtCompose { uses, items })
+	}
+}
+
+enum AdtItem {
+	EnumDeclaration(EnumDeclaration),
+	PatternType(PatternTypeDeclaration),
+	SubtypeImpl(SubtypeImplDeclaration),
+	TypeAlias(TypeAlias),
+}
+
+impl Parse for AdtItem {
+	fn parse(input: ParseStream) -> Result<Self> {
+		if input.peek(Token![enum]) {
+			Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
+				input,
+				Vec::new(),
+				Vec::new(),
+			)?))
+		} else if input.peek(Token![type]) {
+			// Disambiguate between pattern types and simple type aliases
+			let fork = input.fork();
+			if fork.parse::<Token![type]>().is_ok()
+				&& fork.parse::<Ident>().is_ok()
+				&& fork.parse::<Token![=]>().is_ok()
+				&& fork.parse::<Ident>().is_ok()
+				&& fork.peek(syn::Ident)
+			{
+				// This looks like a pattern type (type X = Y is ...)
+				Ok(AdtItem::PatternType(input.parse()?))
+			} else {
+				// This is a simple type alias (type X = Y<T>)
+				Ok(AdtItem::TypeAlias(input.parse()?))
+			}
+		} else if input.peek(Token![impl]) {
+			Ok(AdtItem::SubtypeImpl(input.parse()?))
+		} else if input.peek(Token![#]) {
+			// Parse outer attributes first
+			let attrs = syn::Attribute::parse_outer(input)?;
+
+			if input.peek(Token![impl]) {
+				// Re-inject attributes for SubtypeImplDeclaration parsing
+				// SubtypeImplDeclaration expects to parse its own attributes, so we need
+				// to handle this differently - it already handles #[derive(SubtypingRelation(...))]
+				// For now, extract derives and pass them, but SubtypeImpl has its own attr handling
+				Ok(AdtItem::SubtypeImpl(SubtypeImplDeclaration::parse_with_attrs(input, attrs)?))
+			} else if input.peek(Token![enum]) {
+				let (derives, other_attrs) = extract_derives(attrs)?;
+				Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
+					input,
+					derives,
+					other_attrs,
+				)?))
+			} else {
+				Err(input.error("Expected 'enum' or 'impl' after attributes"))
+			}
+		} else {
+			Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
+		}
+	}
+}
+
+enum CompositionPart {
+	TypeRef(Ident, Option<syn::AngleBracketedGenericArguments>), // External enum like CoreAtoms or Container<T>
+	BoxedTypeRef(Ident),                                         // Box<TypedTermComplex>
+	InlineVariants { variants: Vec<Variant> },                   // { ... }
+}
+
+struct EnumBody(Vec<CompositionPart>);
+
+impl EnumBody {
+	fn parse_composition_parts(input: ParseStream, parts: &mut Vec<CompositionPart>) -> Result<()> {
+		loop {
+			if input.peek(syn::token::Brace) {
+				// Inline variants: { ... }
+				let variants_content;
+				braced!(variants_content in input);
+				let variants = variants_content.parse_terminated(Variant::parse, Token![,])?.into_iter().collect();
+				parts.push(CompositionPart::InlineVariants { variants });
+			} else if input.peek(Ident) && input.peek2(Token![<]) {
+				// Generic type reference like Container<T> or Box<Type>
+				let ident: Ident = input.parse()?;
+				if ident == "Box" {
+					input.parse::<Token![<]>()?;
+					let type_name: Ident = input.parse()?;
+					input.parse::<Token![>]>()?;
+					parts.push(CompositionPart::BoxedTypeRef(type_name));
+				} else {
+					// Generic type reference - preserve the generics
+					let generics: syn::AngleBracketedGenericArguments = input.parse()?;
+					parts.push(CompositionPart::TypeRef(ident, Some(generics)));
+				}
+			} else if input.peek(Ident) {
+				// Simple type reference
+				let type_name: Ident = input.parse()?;
+				parts.push(CompositionPart::TypeRef(type_name, None));
+			} else {
+				return Err(input.error("Expected type reference or inline variants"));
+			}
+
+			// Check for continuation with |
+			if input.peek(Token![|]) {
+				input.parse::<Token![|]>()?;
+			} else {
+				break;
+			}
+		}
+		Ok(())
+	}
+}
+
+impl Parse for EnumBody {
+	fn parse(input: ParseStream) -> Result<Self> {
+		// Handle both braced and direct union syntax
+		if input.peek(syn::token::Brace) {
+			// New syntax: = { ... }
+			let content;
+			braced!(content in input);
+
+			if content.is_empty() {
+				return Err(content.error("Empty enum body"));
+			}
+
+			// Inside braces, we only allow simple variants, not union syntax
+			let mut variants = Vec::new();
+			while !content.is_empty() {
+				variants.push(content.parse::<Variant>()?);
+
+				if content.peek(Token![,]) {
+					content.parse::<Token![,]>()?;
+				} else if content.peek(Token![|]) {
+					return Err(content.error(
+						"Union syntax (|) is not allowed inside braces. To compose types, use: enum MyEnum = TypeA | TypeB | { variants }",
+					));
+				} else if !content.is_empty() {
+					return Err(content.error("Expected ',' between variants"));
+				}
+			}
+			Ok(EnumBody(vec![CompositionPart::InlineVariants { variants }]))
+		} else {
+			// Direct syntax: = TypeRef | TypeRef | { ... }
+			let mut parts = Vec::new();
+			EnumBody::parse_composition_parts(input, &mut parts)?;
+			Ok(EnumBody(parts))
+		}
+	}
+}
+
+struct EnumDeclaration {
+	pub attrs: Vec<syn::Attribute>,
+	pub derives: Vec<syn::Path>,
+	pub name: Ident,
+	pub generics: Option<Generics>,
+	pub pattern_param: Option<(Ident, Ident)>, // (param_name, trait_name) for "is <P: PatternFields>"
+	pub parts: EnumBody,
+}
+
+impl EnumDeclaration {
+	/// Build the complete generics list combining regular generics with optional pattern parameter
+	pub fn full_generics(&self) -> TokenStream2 {
+		match (&self.generics, &self.pattern_param) {
+			(Some(generics), Some((param_name, trait_name))) => {
+				let params = &generics.params;
+				quote! { <#params, #param_name: #trait_name> }
+			}
+			(Some(generics), None) => quote! { #generics },
+			(None, Some((param_name, trait_name))) => quote! { <#param_name: #trait_name> },
+			(None, None) => quote! {},
+		}
+	}
+
+	/// Build the enum type with appropriate generic parameters
+	pub fn enum_type(&self) -> TokenStream2 {
+		let enum_name = &self.name;
+		if let Some((param_name, _)) = &self.pattern_param {
+			quote! { #enum_name<#param_name> }
+		} else {
+			let generics = &self.generics;
+			quote! { #enum_name #generics }
+		}
+	}
+}
+
+impl EnumDeclaration {
+	fn parse_with_attrs(input: ParseStream, derives: Vec<syn::Path>, attrs: Vec<syn::Attribute>) -> Result<Self> {
+		// 'enum' keyword is now mandatory
+		input.parse::<Token![enum]>()?;
+
+		let name: Ident = input.parse()?;
+
+		let generics = if input.peek(Token![<]) {
+			Some(input.parse::<Generics>()?)
+		} else {
+			None
+		};
+
+		// Check for "is <P: Trait>" pattern parameter
+		let pattern_param = if input.peek(syn::Ident) && input.peek2(Token![<]) {
+			// Parse "is" keyword
+			let is_kw: Ident = input.parse()?;
+			if is_kw != "is" {
+				return Err(syn::Error::new_spanned(is_kw, "Expected 'is' keyword"));
+			}
+
+			// Parse <P: Trait>
+			input.parse::<Token![<]>()?;
+			let param_name: Ident = input.parse()?;
+			input.parse::<Token![:]>()?;
+			let trait_name: Ident = input.parse()?;
+			input.parse::<Token![>]>()?;
+
+			Some((param_name, trait_name))
+		} else {
+			None
+		};
+
+		input.parse::<Token![=]>()?;
+
+		// Parse composition - can be simple variants or union syntax
+		let parts = input.parse::<EnumBody>()?;
+
+		Ok(EnumDeclaration {
+			attrs,
+			derives,
+			name,
+			generics,
+			pattern_param,
+			parts,
+		})
+	}
+}
+
+impl Parse for EnumDeclaration {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Self::parse_with_attrs(input, Vec::new(), Vec::new())
+	}
+}
+
+#[derive(Clone, Default)]
+struct FieldAttributes {
+	pub attrs: Vec<syn::Attribute>,
+	/// Safety-critical iteration expression for pattern checking
+	pub unsafe_transmute_check_iter: Option<String>,
+}
+
+/// Cleaner pattern type declaration
+struct PatternTypeDeclaration {
+	pub name: Ident,
+	pub base_type: Ident,
+	pub pattern: VariantPattern,
+}
+
+impl syn::parse::Parse for PatternTypeDeclaration {
+	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+		input.parse::<Token![type]>()?;
+		let name: Ident = input.parse()?;
+		input.parse::<Token![=]>()?;
+		let base_type: Ident = input.parse()?;
+
+		let pattern = VariantPattern::parse_is_pattern(input)?;
+
+		Ok(Self { name, base_type, pattern })
+	}
+}
+
+#[derive(Debug, PartialEq)]
+enum SubtypeAttribute {
+	SubtypingRelation(SubtypingRelation),
+}
+
+struct SubtypeImplDeclaration {
+	subtype: Ident,
+	supertype: Ident,
+	attributes: Vec<SubtypeAttribute>,
+}
+
+impl SubtypeImplDeclaration {
+	fn parse_with_attrs(input: ParseStream, attrs: Vec<syn::Attribute>) -> Result<Self> {
+		let mut attributes = Vec::new();
+
+		for attr in attrs {
+			if attr.path().is_ident("derive") {
+				// Parse the meta list inside derive(...)
+				let nested = attr.parse_args_with(|input: ParseStream| {
+					let punctuated: Punctuated<NestedMeta, Token![,]> = Punctuated::parse_terminated(input)?;
+					Ok(punctuated)
+				})?;
+
+				for meta in nested {
+					if let NestedMeta::Meta(meta) = meta
+						&& meta.path().is_ident("SubtypingRelation")
+					{
+						// Use darling to parse the SubtypingRelation
+						let subtyping_rel = SubtypingRelation::from_meta(&meta).map_err(|e| syn::Error::new_spanned(&meta, e.to_string()))?;
+						attributes.push(SubtypeAttribute::SubtypingRelation(subtyping_rel));
+					}
+				}
+			}
+		}
+
+		input.parse::<Token![impl]>()?;
+		let subtype: Ident = input.parse()?;
+		input.parse::<Token![:]>()?;
+		let supertype: Ident = input.parse()?;
+
+		Ok(SubtypeImplDeclaration {
+			subtype,
+			supertype,
+			attributes,
+		})
+	}
+}
+
+impl Parse for SubtypeImplDeclaration {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let attrs = syn::Attribute::parse_outer(input)?;
+		Self::parse_with_attrs(input, attrs)
+	}
+}
 
 /// Parse #[derive(SubtypingRelation(upcast=to_flex, downcast=try_to_strict))]
 // <generated by cargo-derive-doc>
@@ -28,6 +376,105 @@ mod patterns;
 struct SubtypingRelation {
 	pub upcast: syn::Ident,
 	pub downcast: syn::Ident,
+}
+
+struct TypeAlias {
+	name: Ident,
+	ty: syn::Type,
+}
+
+impl Parse for TypeAlias {
+	fn parse(input: ParseStream) -> Result<Self> {
+		input.parse::<Token![type]>()?;
+		let name: Ident = input.parse()?;
+		input.parse::<Token![=]>()?;
+		let ty: syn::Type = input.parse()?;
+
+		Ok(TypeAlias { name, ty })
+	}
+}
+
+struct UseDeclaration {
+	path: syn::Path,
+}
+
+impl Parse for UseDeclaration {
+	fn parse(input: ParseStream) -> Result<Self> {
+		input.parse::<Token![use]>()?;
+		let path = input.parse::<syn::Path>()?;
+		Ok(UseDeclaration { path })
+	}
+}
+
+#[derive(Clone)]
+struct Variant {
+	pub attrs: Vec<syn::Attribute>,
+	pub name: Ident,
+	pub fields: Option<VariantFields>,
+}
+
+impl Parse for Variant {
+	fn parse(input: ParseStream) -> Result<Self> {
+		// Parse variant-level attributes (including doc comments)
+		let attrs = syn::Attribute::parse_outer(input)?;
+
+		let name: Ident = input.parse()?;
+
+		let fields = if input.peek(syn::token::Brace) {
+			let content;
+			braced!(content in input);
+			let mut named_fields = Vec::new();
+
+			while !content.is_empty() {
+				// Parse field attributes (including doc comments)
+				let field_outer_attrs = syn::Attribute::parse_outer(&content)?;
+				let mut field_attrs = FieldAttributes {
+					attrs: field_outer_attrs.clone(),
+					..Default::default()
+				};
+
+				for attr in &field_outer_attrs {
+					if attr.path().is_ident("unsafe_transmute_check") {
+						// Parse the attribute content
+						attr.parse_nested_meta(|meta| {
+							if meta.path.is_ident("iter") {
+								meta.input.parse::<Token![=]>()?;
+								let iter_expr: syn::LitStr = meta.input.parse()?;
+								field_attrs.unsafe_transmute_check_iter = Some(iter_expr.value());
+							}
+							Ok(())
+						})?;
+					}
+				}
+
+				let field_name: Ident = content.parse()?;
+				content.parse::<Token![:]>()?;
+				let field_type: syn::Type = content.parse()?;
+				named_fields.push((field_name, field_type, field_attrs));
+
+				if content.peek(Token![,]) {
+					content.parse::<Token![,]>()?;
+				}
+			}
+
+			Some(VariantFields::Named(named_fields))
+		} else if input.peek(syn::token::Paren) {
+			let content;
+			syn::parenthesized!(content in input);
+			let types = content.parse_terminated(syn::Type::parse, Token![,])?;
+			Some(VariantFields::Unnamed(types.into_iter().collect()))
+		} else {
+			None
+		};
+
+		Ok(Variant { attrs, name, fields })
+	}
+}
+
+#[derive(Clone)]
+enum VariantFields {
+	Named(Vec<(Ident, syn::Type, FieldAttributes)>),
+	Unnamed(Vec<syn::Type>),
 }
 
 /// Parse pattern types more cleanly
@@ -117,475 +564,6 @@ impl VariantPattern {
 
 		Ok(VariantPattern::Variants(variants))
 	}
-}
-
-/// Cleaner pattern type declaration
-struct PatternTypeDeclaration {
-	pub name: Ident,
-	pub base_type: Ident,
-	pub pattern: VariantPattern,
-}
-
-impl syn::parse::Parse for PatternTypeDeclaration {
-	fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-		input.parse::<Token![type]>()?;
-		let name: Ident = input.parse()?;
-		input.parse::<Token![=]>()?;
-		let base_type: Ident = input.parse()?;
-
-		let pattern = VariantPattern::parse_is_pattern(input)?;
-
-		Ok(Self { name, base_type, pattern })
-	}
-}
-
-struct AdtCompose {
-	uses: Vec<UseDeclaration>,
-	items: Vec<AdtItem>,
-}
-
-struct UseDeclaration {
-	path: syn::Path,
-}
-
-enum AdtItem {
-	EnumDeclaration(EnumDeclaration),
-	PatternType(PatternTypeDeclaration),
-	SubtypeImpl(SubtypeImplDeclaration),
-	TypeAlias(TypeAlias),
-}
-
-struct EnumDeclaration {
-	pub attrs: Vec<syn::Attribute>,
-	pub derives: Vec<syn::Path>,
-	pub name: Ident,
-	pub generics: Option<Generics>,
-	pub pattern_param: Option<(Ident, Ident)>, // (param_name, trait_name) for "is <P: PatternFields>"
-	pub parts: EnumBody,
-}
-
-impl EnumDeclaration {
-	/// Build the complete generics list combining regular generics with optional pattern parameter
-	pub fn full_generics(&self) -> TokenStream2 {
-		match (&self.generics, &self.pattern_param) {
-			(Some(generics), Some((param_name, trait_name))) => {
-				let params = &generics.params;
-				quote! { <#params, #param_name: #trait_name> }
-			}
-			(Some(generics), None) => quote! { #generics },
-			(None, Some((param_name, trait_name))) => quote! { <#param_name: #trait_name> },
-			(None, None) => quote! {},
-		}
-	}
-
-	/// Build the enum type with appropriate generic parameters
-	pub fn enum_type(&self) -> TokenStream2 {
-		let enum_name = &self.name;
-		if let Some((param_name, _)) = &self.pattern_param {
-			quote! { #enum_name<#param_name> }
-		} else {
-			let generics = &self.generics;
-			quote! { #enum_name #generics }
-		}
-	}
-}
-
-struct EnumBody(Vec<CompositionPart>);
-
-enum CompositionPart {
-	TypeRef(Ident, Option<syn::AngleBracketedGenericArguments>), // External enum like CoreAtoms or Container<T>
-	BoxedTypeRef(Ident),                                         // Box<TypedTermComplex>
-	InlineVariants { variants: Vec<Variant> },                   // { ... }
-}
-
-struct SubtypeImplDeclaration {
-	subtype: Ident,
-	supertype: Ident,
-	attributes: Vec<SubtypeAttribute>,
-}
-
-struct TypeAlias {
-	name: Ident,
-	ty: syn::Type,
-}
-
-#[derive(Debug, PartialEq)]
-enum SubtypeAttribute {
-	SubtypingRelation(SubtypingRelation),
-}
-
-#[derive(Clone)]
-struct Variant {
-	pub attrs: Vec<syn::Attribute>,
-	pub name: Ident,
-	pub fields: Option<VariantFields>,
-}
-
-#[derive(Clone)]
-enum VariantFields {
-	Named(Vec<(Ident, syn::Type, FieldAttributes)>),
-	Unnamed(Vec<syn::Type>),
-}
-
-#[derive(Clone, Default)]
-struct FieldAttributes {
-	pub attrs: Vec<syn::Attribute>,
-	/// Safety-critical iteration expression for pattern checking
-	pub unsafe_transmute_check_iter: Option<String>,
-}
-
-/// Extract derive macro paths from attributes, returning (derives, other_attrs)
-fn extract_derives(attrs: Vec<syn::Attribute>) -> Result<(Vec<syn::Path>, Vec<syn::Attribute>)> {
-	let mut derives = Vec::new();
-	let mut other_attrs = Vec::new();
-	for attr in attrs {
-		if attr.path().is_ident("derive") {
-			attr.parse_nested_meta(|meta| {
-				derives.push(meta.path);
-				Ok(())
-			})?;
-		} else {
-			other_attrs.push(attr);
-		}
-	}
-	Ok((derives, other_attrs))
-}
-
-impl Parse for UseDeclaration {
-	fn parse(input: ParseStream) -> Result<Self> {
-		input.parse::<Token![use]>()?;
-		let path = input.parse::<syn::Path>()?;
-		Ok(UseDeclaration { path })
-	}
-}
-
-impl Parse for AdtItem {
-	fn parse(input: ParseStream) -> Result<Self> {
-		if input.peek(Token![enum]) {
-			Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
-				input,
-				Vec::new(),
-				Vec::new(),
-			)?))
-		} else if input.peek(Token![type]) {
-			// Disambiguate between pattern types and simple type aliases
-			let fork = input.fork();
-			if fork.parse::<Token![type]>().is_ok()
-				&& fork.parse::<Ident>().is_ok()
-				&& fork.parse::<Token![=]>().is_ok()
-				&& fork.parse::<Ident>().is_ok()
-				&& fork.peek(syn::Ident)
-			{
-				// This looks like a pattern type (type X = Y is ...)
-				Ok(AdtItem::PatternType(input.parse()?))
-			} else {
-				// This is a simple type alias (type X = Y<T>)
-				Ok(AdtItem::TypeAlias(input.parse()?))
-			}
-		} else if input.peek(Token![impl]) {
-			Ok(AdtItem::SubtypeImpl(input.parse()?))
-		} else if input.peek(Token![#]) {
-			// Parse outer attributes first
-			let attrs = syn::Attribute::parse_outer(input)?;
-
-			if input.peek(Token![impl]) {
-				// Re-inject attributes for SubtypeImplDeclaration parsing
-				// SubtypeImplDeclaration expects to parse its own attributes, so we need
-				// to handle this differently - it already handles #[derive(SubtypingRelation(...))]
-				// For now, extract derives and pass them, but SubtypeImpl has its own attr handling
-				Ok(AdtItem::SubtypeImpl(SubtypeImplDeclaration::parse_with_attrs(input, attrs)?))
-			} else if input.peek(Token![enum]) {
-				let (derives, other_attrs) = extract_derives(attrs)?;
-				Ok(AdtItem::EnumDeclaration(EnumDeclaration::parse_with_attrs(
-					input,
-					derives,
-					other_attrs,
-				)?))
-			} else {
-				Err(input.error("Expected 'enum' or 'impl' after attributes"))
-			}
-		} else {
-			Err(input.error("Expected 'enum', 'type', or 'impl' declaration"))
-		}
-	}
-}
-
-impl EnumDeclaration {
-	fn parse_with_attrs(input: ParseStream, derives: Vec<syn::Path>, attrs: Vec<syn::Attribute>) -> Result<Self> {
-		// 'enum' keyword is now mandatory
-		input.parse::<Token![enum]>()?;
-
-		let name: Ident = input.parse()?;
-
-		let generics = if input.peek(Token![<]) {
-			Some(input.parse::<Generics>()?)
-		} else {
-			None
-		};
-
-		// Check for "is <P: Trait>" pattern parameter
-		let pattern_param = if input.peek(syn::Ident) && input.peek2(Token![<]) {
-			// Parse "is" keyword
-			let is_kw: Ident = input.parse()?;
-			if is_kw != "is" {
-				return Err(syn::Error::new_spanned(is_kw, "Expected 'is' keyword"));
-			}
-
-			// Parse <P: Trait>
-			input.parse::<Token![<]>()?;
-			let param_name: Ident = input.parse()?;
-			input.parse::<Token![:]>()?;
-			let trait_name: Ident = input.parse()?;
-			input.parse::<Token![>]>()?;
-
-			Some((param_name, trait_name))
-		} else {
-			None
-		};
-
-		input.parse::<Token![=]>()?;
-
-		// Parse composition - can be simple variants or union syntax
-		let parts = input.parse::<EnumBody>()?;
-
-		Ok(EnumDeclaration {
-			attrs,
-			derives,
-			name,
-			generics,
-			pattern_param,
-			parts,
-		})
-	}
-}
-
-impl Parse for EnumDeclaration {
-	fn parse(input: ParseStream) -> Result<Self> {
-		Self::parse_with_attrs(input, Vec::new(), Vec::new())
-	}
-}
-
-impl Parse for EnumBody {
-	fn parse(input: ParseStream) -> Result<Self> {
-		// Handle both braced and direct union syntax
-		if input.peek(syn::token::Brace) {
-			// New syntax: = { ... }
-			let content;
-			braced!(content in input);
-
-			if content.is_empty() {
-				return Err(content.error("Empty enum body"));
-			}
-
-			// Inside braces, we only allow simple variants, not union syntax
-			let mut variants = Vec::new();
-			while !content.is_empty() {
-				variants.push(content.parse::<Variant>()?);
-
-				if content.peek(Token![,]) {
-					content.parse::<Token![,]>()?;
-				} else if content.peek(Token![|]) {
-					return Err(content.error(
-						"Union syntax (|) is not allowed inside braces. To compose types, use: enum MyEnum = TypeA | TypeB | { variants }",
-					));
-				} else if !content.is_empty() {
-					return Err(content.error("Expected ',' between variants"));
-				}
-			}
-			Ok(EnumBody(vec![CompositionPart::InlineVariants { variants }]))
-		} else {
-			// Direct syntax: = TypeRef | TypeRef | { ... }
-			let mut parts = Vec::new();
-			EnumBody::parse_composition_parts(input, &mut parts)?;
-			Ok(EnumBody(parts))
-		}
-	}
-}
-
-impl EnumBody {
-	fn parse_composition_parts(input: ParseStream, parts: &mut Vec<CompositionPart>) -> Result<()> {
-		loop {
-			if input.peek(syn::token::Brace) {
-				// Inline variants: { ... }
-				let variants_content;
-				braced!(variants_content in input);
-				let variants = variants_content.parse_terminated(Variant::parse, Token![,])?.into_iter().collect();
-				parts.push(CompositionPart::InlineVariants { variants });
-			} else if input.peek(Ident) && input.peek2(Token![<]) {
-				// Generic type reference like Container<T> or Box<Type>
-				let ident: Ident = input.parse()?;
-				if ident == "Box" {
-					input.parse::<Token![<]>()?;
-					let type_name: Ident = input.parse()?;
-					input.parse::<Token![>]>()?;
-					parts.push(CompositionPart::BoxedTypeRef(type_name));
-				} else {
-					// Generic type reference - preserve the generics
-					let generics: syn::AngleBracketedGenericArguments = input.parse()?;
-					parts.push(CompositionPart::TypeRef(ident, Some(generics)));
-				}
-			} else if input.peek(Ident) {
-				// Simple type reference
-				let type_name: Ident = input.parse()?;
-				parts.push(CompositionPart::TypeRef(type_name, None));
-			} else {
-				return Err(input.error("Expected type reference or inline variants"));
-			}
-
-			// Check for continuation with |
-			if input.peek(Token![|]) {
-				input.parse::<Token![|]>()?;
-			} else {
-				break;
-			}
-		}
-		Ok(())
-	}
-}
-
-impl Parse for TypeAlias {
-	fn parse(input: ParseStream) -> Result<Self> {
-		input.parse::<Token![type]>()?;
-		let name: Ident = input.parse()?;
-		input.parse::<Token![=]>()?;
-		let ty: syn::Type = input.parse()?;
-
-		Ok(TypeAlias { name, ty })
-	}
-}
-
-impl SubtypeImplDeclaration {
-	fn parse_with_attrs(input: ParseStream, attrs: Vec<syn::Attribute>) -> Result<Self> {
-		let mut attributes = Vec::new();
-
-		for attr in attrs {
-			if attr.path().is_ident("derive") {
-				// Parse the meta list inside derive(...)
-				let nested = attr.parse_args_with(|input: ParseStream| {
-					let punctuated: Punctuated<NestedMeta, Token![,]> = Punctuated::parse_terminated(input)?;
-					Ok(punctuated)
-				})?;
-
-				for meta in nested {
-					if let NestedMeta::Meta(meta) = meta
-						&& meta.path().is_ident("SubtypingRelation")
-					{
-						// Use darling to parse the SubtypingRelation
-						let subtyping_rel = SubtypingRelation::from_meta(&meta).map_err(|e| syn::Error::new_spanned(&meta, e.to_string()))?;
-						attributes.push(SubtypeAttribute::SubtypingRelation(subtyping_rel));
-					}
-				}
-			}
-		}
-
-		input.parse::<Token![impl]>()?;
-		let subtype: Ident = input.parse()?;
-		input.parse::<Token![:]>()?;
-		let supertype: Ident = input.parse()?;
-
-		Ok(SubtypeImplDeclaration {
-			subtype,
-			supertype,
-			attributes,
-		})
-	}
-}
-
-impl Parse for SubtypeImplDeclaration {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let attrs = syn::Attribute::parse_outer(input)?;
-		Self::parse_with_attrs(input, attrs)
-	}
-}
-
-impl Parse for AdtCompose {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let mut uses = Vec::new();
-		let mut items = Vec::new();
-
-		// Parse use declarations first
-		while input.peek(Token![use]) {
-			uses.push(input.parse::<UseDeclaration>()?);
-			if input.peek(Token![;]) {
-				input.parse::<Token![;]>()?;
-			}
-		}
-
-		// Parse items
-		while !input.is_empty() {
-			items.push(input.parse::<AdtItem>()?);
-			if input.peek(Token![;]) {
-				input.parse::<Token![;]>()?;
-			}
-		}
-
-		Ok(AdtCompose { uses, items })
-	}
-}
-
-impl Parse for Variant {
-	fn parse(input: ParseStream) -> Result<Self> {
-		// Parse variant-level attributes (including doc comments)
-		let attrs = syn::Attribute::parse_outer(input)?;
-
-		let name: Ident = input.parse()?;
-
-		let fields = if input.peek(syn::token::Brace) {
-			let content;
-			braced!(content in input);
-			let mut named_fields = Vec::new();
-
-			while !content.is_empty() {
-				// Parse field attributes (including doc comments)
-				let field_outer_attrs = syn::Attribute::parse_outer(&content)?;
-				let mut field_attrs = FieldAttributes {
-					attrs: field_outer_attrs.clone(),
-					..Default::default()
-				};
-
-				for attr in &field_outer_attrs {
-					if attr.path().is_ident("unsafe_transmute_check") {
-						// Parse the attribute content
-						attr.parse_nested_meta(|meta| {
-							if meta.path.is_ident("iter") {
-								meta.input.parse::<Token![=]>()?;
-								let iter_expr: syn::LitStr = meta.input.parse()?;
-								field_attrs.unsafe_transmute_check_iter = Some(iter_expr.value());
-							}
-							Ok(())
-						})?;
-					}
-				}
-
-				let field_name: Ident = content.parse()?;
-				content.parse::<Token![:]>()?;
-				let field_type: syn::Type = content.parse()?;
-				named_fields.push((field_name, field_type, field_attrs));
-
-				if content.peek(Token![,]) {
-					content.parse::<Token![,]>()?;
-				}
-			}
-
-			Some(VariantFields::Named(named_fields))
-		} else if input.peek(syn::token::Paren) {
-			let content;
-			syn::parenthesized!(content in input);
-			let types = content.parse_terminated(syn::Type::parse, Token![,])?;
-			Some(VariantFields::Unnamed(types.into_iter().collect()))
-		} else {
-			None
-		};
-
-		Ok(Variant { attrs, name, fields })
-	}
-}
-
-#[proc_macro]
-pub fn pattern_wishcast(tokens: TokenStream) -> TokenStream {
-	let input = parse_macro_input!(tokens as AdtCompose);
-	let expanded = expand_pattern_wishcast(&input);
-	TokenStream::from(expanded)
 }
 
 fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
@@ -907,6 +885,23 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 	}
 
 	output
+}
+
+/// Extract derive macro paths from attributes, returning (derives, other_attrs)
+fn extract_derives(attrs: Vec<syn::Attribute>) -> Result<(Vec<syn::Path>, Vec<syn::Attribute>)> {
+	let mut derives = Vec::new();
+	let mut other_attrs = Vec::new();
+	for attr in attrs {
+		if attr.path().is_ident("derive") {
+			attr.parse_nested_meta(|meta| {
+				derives.push(meta.path);
+				Ok(())
+			})?;
+		} else {
+			other_attrs.push(attr);
+		}
+	}
+	Ok((derives, other_attrs))
 }
 
 fn generate_subtype_conversions(
@@ -1303,4 +1298,11 @@ fn generate_test_value_for_type(
 	} else {
 		Err(format!("Unsupported type for test generation: {type_str}"))
 	}
+}
+
+#[proc_macro]
+pub fn pattern_wishcast(tokens: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(tokens as AdtCompose);
+	let expanded = expand_pattern_wishcast(&input);
+	TokenStream::from(expanded)
 }
