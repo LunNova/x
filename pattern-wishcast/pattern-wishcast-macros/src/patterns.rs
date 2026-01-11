@@ -6,23 +6,17 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::collections::HashSet;
 
-use crate::{EnumDeclaration, PatternTypeDeclaration, VariantPattern};
+use crate::{PatternTypeDeclaration, VariantPattern};
 
-/// Generate strictness trait and types for pattern support
+/// Generate strictness trait and types for pattern support.
+/// `strictness_trait_name` is the trait name from the enum's `is <P: TraitName>` declaration.
 pub fn generate_strictness_system(
-	enum_decl: &EnumDeclaration,
+	enum_name: &syn::Ident,
+	strictness_trait_name: &syn::Ident,
 	pattern_types: &[&PatternTypeDeclaration],
 	conditional_variants: &HashSet<String>,
 ) -> TokenStream2 {
 	let mut output = TokenStream2::new();
-	let enum_name = &enum_decl.name;
-
-	// Generate strictness trait using user-specified name or default
-	let strictness_trait_name = if let Some((_, trait_name)) = &enum_decl.pattern_param {
-		trait_name.clone()
-	} else {
-		syn::Ident::new(&format!("{enum_name}Strictness"), enum_name.span())
-	};
 
 	let strictness_assoc_types: Vec<_> = conditional_variants
 		.iter()

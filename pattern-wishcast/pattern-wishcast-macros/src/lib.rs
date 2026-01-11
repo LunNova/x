@@ -868,9 +868,16 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 
 		// Only do pattern-specific generation if we have conditional variants
 		if !conditional_variants.is_empty() {
+			// pattern_param is guaranteed Some when conditional_variants is non-empty
+			let (_, strictness_trait_name) = enum_decl
+				.pattern_param
+				.as_ref()
+				.expect("conditional_variants requires pattern_param");
+
 			// Generate strictness system
 			output.extend(patterns::generate_strictness_system(
-				enum_decl,
+				enum_name,
+				strictness_trait_name,
 				&enum_pattern_types,
 				&conditional_variants,
 			));
