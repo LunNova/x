@@ -19,5 +19,5 @@ pub type Never = !;
 /// When the `never_type` feature is enabled, this is an alias to the unstable never type (`!`).
 /// Otherwise, this is a stable equivalent enum that works on stable Rust.
 #[cfg(not(feature = "never_type"))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Never {}
