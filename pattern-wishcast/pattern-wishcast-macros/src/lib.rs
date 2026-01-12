@@ -11,7 +11,7 @@ mod patterns;
 use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
 	Generics, Ident, Result, Token, braced,
 	parse::{Parse, ParseStream},
@@ -670,6 +670,24 @@ fn expand_pattern_wishcast(input: &AdtCompose) -> TokenStream2 {
 						name: type_name.clone(),
 						fields: Some(VariantFields::Unnamed(vec![syn::parse_quote! { Box<#type_name> }])),
 					});
+				}
+			}
+		}
+
+		// Validate that all variants referenced in pattern types actually exist
+		for pattern_type in &enum_pattern_types {
+			if let VariantPattern::Variants(variants) = &pattern_type.pattern {
+				for variant in variants {
+					let variant_str = variant.to_string();
+					if !variant_names.contains(&variant_str) {
+						let base_type = &pattern_type.base_type;
+						return quote_spanned! { variant.span() =>
+							compile_error!(concat!(
+								"variant `", #variant_str,
+								"` does not exist in enum `", stringify!(#base_type), "`"
+							));
+						};
+					}
 				}
 			}
 		}

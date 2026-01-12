@@ -1,0 +1,5 @@
+error: variant `NonExistent` does not exist in enum `Value`
+  --> tests/ui/nonexistent_variant_in_pattern.rs:16:46
+   |
+16 |     type BrokenValue = Value is Number { .. } | NonExistent { .. };
+   |                                                 ^^^^^^^^^^^
