@@ -80,6 +80,7 @@
           buildInputs = [
             pkgs.pkg-config
             pkgs.clang
+            pkgs.cargo-deny
             pkgs.cargo-llvm-cov
             pkgs.cargo-modules
             pkgs.cargo-flamegraph

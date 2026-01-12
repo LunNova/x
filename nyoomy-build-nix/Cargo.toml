@@ -3,6 +3,7 @@ name = "nyoomy-build-nix"
 version = "0.1.0"
 rust-version.workspace = true
 edition.workspace = true
+publish = false
 
 [[bin]]
 name = "nyoomy-build-nix"
