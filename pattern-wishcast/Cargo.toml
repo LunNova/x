@@ -6,7 +6,7 @@
 [package]
 name = "pattern-wishcast"
 description = "Pattern types emulation for conditional variants using conditional never types"
-version = "0.0.1-pre.6"
+version = "0.0.1-pre.7"
 edition = "2024"
 rust-version = "1.85"
 repository = "https://github.com/LunNova/x"
