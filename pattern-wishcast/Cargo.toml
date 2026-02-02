@@ -23,7 +23,7 @@ never_type = []
 
 [dev-dependencies]
 trybuild = "1.0"
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 
 [package.metadata.workspaces]
 independent = true
