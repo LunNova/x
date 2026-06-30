@@ -25,7 +25,7 @@ notify = "8.0"
 num_cpus = "1.16.0"
 opentelemetry = "0.31.0"
 opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "reqwest-client"] }
-opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
+opentelemetry_sdk = { version = "0.32.0", features = ["rt-tokio"] }
 pulldown-cmark = "0.13.0"
 syntect = "5.2"
 two-face = { version = "0.5", features = ["syntect-default-onig"] }
