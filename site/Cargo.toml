@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 autometrics = { version = "3", features = ["opentelemetry-0_30"] }
 blake3 = "1.5.4"
-fastcdc = "3.1.0"
+fastcdc = "5.0.0"
 futures = "0.3.30"
 gray_matter = "0.3.0"
 serde_yaml = "0.9"
