@@ -22,7 +22,7 @@ path = "src/main.rs"
 ra_ap_syntax = "0.0.312"
 argh = "0.1"
 anyhow = "1.0"
-similar = "2.7"
+similar = "3.0"
 walkdir = "2"
 toml = "0.8"
 
