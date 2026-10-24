@@ -17,7 +17,7 @@ proc-macro2 = { version = "1.0", features = ["span-locations"] }
 quote = "1.0"
 anyhow = "1.0"
 argh = "0.1"
-similar = "2.7"
+similar = "3.0"
 
 [dev-dependencies]
 error_set = "0.9"
